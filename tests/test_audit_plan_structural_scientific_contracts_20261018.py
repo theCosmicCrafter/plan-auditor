@@ -207,7 +207,7 @@ def test_named_plans_discovery_ignores_unsafe_basename_and_nonjson_files(tmp_pat
 
 
 def test_missing_plan_file_reports_explicit_operator_failure_not_success(tmp_path):
-    with pytest.raises(SystemExit, match="plan yok"):
+    with pytest.raises(SystemExit, match="plan not found"):
         core.load_plan(str(tmp_path))
 
 
@@ -216,7 +216,7 @@ def test_large_plan_is_rejected_before_json_parse(tmp_path, monkeypatch):
     pg = tmp_path / ".plan-auditor"
     pg.mkdir()
     (pg / "plan.json").write_bytes(b"{" * 102)
-    with pytest.raises(SystemExit, match="plan cok buyuk"):
+    with pytest.raises(SystemExit, match="plan too large"):
         core.load_plan(str(tmp_path))
 
 

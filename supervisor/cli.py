@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from scripts.console import configure_console_output
+
 from .exit_codes import ExitCode
 
 SUPERVISOR_START_TIMEOUT_SEC = 60.0
@@ -118,7 +120,7 @@ def _root(value: str) -> Path:
 
 
 def _json(payload: Any) -> None:
-    print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
+    print(json.dumps(payload, indent=2, ensure_ascii=True, default=str))
 
 
 def _persist_supervisor_config(root: Path, profile: str, mode: str) -> None:
@@ -790,6 +792,7 @@ def _forward_core(argv: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_console_output()
     parser = _build_parser()
     args, rest = parser.parse_known_args(argv)
     if args.cmd in {"run", "validate"}:
