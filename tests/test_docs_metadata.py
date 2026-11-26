@@ -419,7 +419,7 @@ def test_pyproject_metadata_is_complete_and_consistent() -> None:
         assert slug in urls[key]
     assert urls["Changelog"].endswith("/CHANGELOG.md")
     assert urls["Security"].endswith("/SECURITY.md")
-    assert urls["Documentation"].endswith("/tree/main/docs")
+    assert urls["Documentation"] == "https://furox-art.github.io/plan-auditor/"
     assert re.fullmatch(r"\d+\.\d+\.\d+", version)
     assert version == _package_version(), "pyproject and package.json versions must match"
 
@@ -433,6 +433,9 @@ def test_project_urls_resolve_to_repository_paths() -> None:
     # GitHub-managed destinations are not files in the tree.
     managed = {"issues", "releases", "tags", "pulls", "actions", "security", "graphs"}
     for key, url in urls.items():
+        if key == "Documentation":
+            assert url == "https://furox-art.github.io/plan-auditor/"
+            continue
         assert url.startswith("https://github.com/"), f"{key} must be a repository URL: {url}"
         path = url.split("https://github.com/", 1)[1].split("/", 2)
         repo_path = "/".join(path[2:])

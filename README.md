@@ -270,9 +270,12 @@ proven, `1` failed, `2` blocked, `3` `UNKNOWN` — and `3` withholds completion 
 passing it. The npm launcher mirrors them and fails closed. Runnable example:
 [`examples/fib/`](https://github.com/Furox-Art/plan-auditor/tree/main/examples/fib).
 
-No rendered documentation site exists yet. `mkdocs build --strict` is a required CI check,
-so the Markdown is known to build, but nothing serves it; build it with
-`python -m pip install mkdocs-material && mkdocs serve`. Files GitHub already renders:
+Rendered documentation is published at
+[https://furox-art.github.io/plan-auditor/](https://furox-art.github.io/plan-auditor/)
+by the docs workflow; `mkdocs build --strict` remains a required CI check. Canonical
+project metadata and documentation target `Furox-Art/plan-auditor`;
+`theCosmicCrafter/plan-auditor` is the downstream fork used for this development
+branch. Files GitHub already renders:
 [SKILL.md](https://github.com/Furox-Art/plan-auditor/blob/main/SKILL.md) ·
 [CONTRIBUTING.md](https://github.com/Furox-Art/plan-auditor/blob/main/CONTRIBUTING.md) ·
 [CHANGELOG.md](https://github.com/Furox-Art/plan-auditor/blob/main/CHANGELOG.md) ·
