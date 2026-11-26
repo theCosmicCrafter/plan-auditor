@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,9 +23,13 @@ def _timestamp() -> str:
 
 
 def python_pytest_template() -> tuple[dict[str, Any], dict[str, Any]]:
-    # Resolve pytest at verification time rather than baking in the auditor or
-    # bootstrap-time interpreter; an activated project virtualenv can then win.
-    check = {"type": "exec", "argv": ["pytest"], "expect_exit": 0}
+    # Resolve the interpreter by name at verification time rather than baking
+    # in a bootstrap-time path; an activated project virtualenv can then win.
+    # The ``-m pytest`` form also places the workspace on ``sys.path``.
+    python = (
+        "python" if sys.platform.startswith("win") or not shutil.which("python3") else "python3"
+    )
+    check = {"type": "exec", "argv": [python, "-m", "pytest"], "expect_exit": 0}
     plan = {
         "task": "Prove the Python test suite passes",
         "created": _timestamp(),

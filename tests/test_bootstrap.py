@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -193,7 +194,25 @@ def test_python_template_can_activate_and_seal(tmp_path: Path, capfd) -> None:
     assert main(["plan", "verify", str(workspace)]) == 0
     capfd.readouterr()
     plan = json.loads((workspace / ".plan-auditor" / "plan.json").read_text(encoding="utf-8"))
-    assert plan["steps"][0]["verify"][0]["argv"] == ["pytest"]
+    argv = plan["steps"][0]["verify"][0]["argv"]
+    assert argv[0] in {"python", "python3"}
+    assert not Path(argv[0]).is_absolute()
+    assert argv[1:] == ["-m", "pytest"]
+
+
+def test_python_template_imports_workspace_modules(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    tests = workspace / "tests"
+    tests.mkdir(parents=True)
+    (workspace / "project_module.py").write_text("VALUE = 42\n", encoding="utf-8")
+    (tests / "test_project_module.py").write_text(
+        "from project_module import VALUE\n\n\ndef test_value():\n    assert VALUE == 42\n",
+        encoding="utf-8",
+    )
+    plan, _request = template_documents("python-pytest")
+    argv = plan["steps"][0]["verify"][0]["argv"]
+    completed = subprocess.run(argv, cwd=workspace, capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 def test_init_workspace_does_not_add_default_plan_beside_named_plans(tmp_path: Path) -> None:
