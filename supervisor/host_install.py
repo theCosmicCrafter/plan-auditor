@@ -138,7 +138,7 @@ def install_skill(
         "operations": operations,
         "changed": len(changed),
         "unchanged": len(operations) - len(changed),
-        "hook_command": f'{sys.executable} "{target / "hooks" / "gate_hook.py"}" "<workspace>"',
+        "hook_command": f'"{sys.executable}" "{target / "hooks" / "gate_hook.py"}" "<workspace>"',
         "settings_modified": False,
         "settings_note": "host settings are not modified automatically; configure the printed hook command in the host if desired",
     }

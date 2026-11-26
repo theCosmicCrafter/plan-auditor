@@ -7,13 +7,18 @@ from pathlib import Path
 
 import pytest
 
+import scripts
+from supervisor import host_install
 from supervisor.cli import main
 from supervisor.host_install import (
     HOST_PATHS,
     InstallSkillError,
+    _iter_asset_files,
+    _unique_backup,
     detect_hosts,
     host_target,
     install_skill,
+    skill_asset_root,
 )
 
 
@@ -63,6 +68,7 @@ def test_install_skill_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert result["changed"] > 0
     assert all(item["action"].startswith("planned-") for item in result["operations"])
     assert not (project / ".claude").exists()
+    assert result["hook_command"].startswith('"')
     assert "gate_hook.py" in result["hook_command"]
     assert result["settings_modified"] is False
 
@@ -125,3 +131,67 @@ def test_install_skill_cli_success(tmp_path: Path, capfd) -> None:
     payload = json.loads(capfd.readouterr().out)
     assert payload["host"] == "claude"
     assert payload["dry_run"] is True
+
+
+def test_skill_asset_root_falls_back_when_not_packaged(monkeypatch) -> None:
+    real_is_dir = Path.is_dir
+
+    def hide_packaged_assets(path):
+        if path.name == "plan_auditor_skill":
+            return False
+        return real_is_dir(path)
+
+    monkeypatch.setattr(Path, "is_dir", hide_packaged_assets)
+    assert skill_asset_root() == Path(host_install.__file__).resolve().parent.parent
+
+
+def test_iter_asset_files_handles_sparse_assets_and_pycache(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "assets"
+    root.mkdir()
+    scripts_root = tmp_path / "fake-scripts"
+    (scripts_root / "__pycache__").mkdir(parents=True)
+    (scripts_root / "__pycache__" / "ignored.py").write_text("ignored = True\\n", encoding="utf-8")
+    monkeypatch.setattr(scripts, "__file__", str(scripts_root / "__init__.py"))
+    assert _iter_asset_files(root) == []
+
+
+def test_unique_backup_avoids_timestamp_collisions(tmp_path: Path, monkeypatch) -> None:
+    target = tmp_path / "SKILL.md"
+    target.write_text("new\\n", encoding="utf-8")
+    monkeypatch.setattr(host_install.time, "strftime", lambda _fmt: "fixed")
+    first = tmp_path / "SKILL.md.bak-fixed"
+    first.write_text("old\\n", encoding="utf-8")
+    assert _unique_backup(target) == tmp_path / "SKILL.md.bak-fixed-1"
+
+
+def test_install_skill_refuses_empty_asset_source(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(host_install, "_iter_asset_files", lambda _root: [])
+    with pytest.raises(InstallSkillError, match="no skill assets"):
+        install_skill("claude", scope="project", directory=tmp_path)
+
+
+def test_install_skill_cli_error_is_fail_closed(tmp_path: Path, monkeypatch, capfd) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+
+    def fail_install(*_args, **_kwargs):
+        raise OSError("copy failed")
+
+    monkeypatch.setattr(host_install, "install_skill", fail_install)
+    assert (
+        main(
+            [
+                "install-skill",
+                "--host",
+                "claude",
+                "--scope",
+                "project",
+                "--dir",
+                str(project),
+            ]
+        )
+        == 2
+    )
+    payload = json.loads(capfd.readouterr().out)
+    assert payload["installed"] is False
+    assert "copy failed" in payload["error"]
