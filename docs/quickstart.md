@@ -22,8 +22,11 @@ pip install plan-auditor
 
 Python 3.11 or newer. No third-party runtime dependencies.
 
-The commands and transcripts on this page were written against a checkout of
-`main` and re-checked against the published `2.4.2` release. See the
+The core commands and transcripts on this page are continuously checked against
+a checkout of `main`. `plan-auditor init`, `plan-auditor install-skill`, and
+`plan-auditor integrity keygen` are new onboarding commands in the development
+branch, not part of the published `2.6.5` registry release; run this exact
+walkthrough from the development build or wait for the next release. See the
 release-status section of the README for what each published version contains.
 
 The examples invoke the interpreter as `python`. On a system that only provides

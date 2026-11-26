@@ -69,6 +69,9 @@ walkthrough below shows those files explicitly.
 are attested under PEP 740 and npm tarballs are attested with Sigstore SLSA provenance
 through the trusted publisher. Per-channel measurements are in
 [docs/release-status.md](https://github.com/Furox-Art/plan-auditor/blob/main/docs/release-status.md).
+The new `init`, `install-skill`, and `integrity keygen` onboarding commands are in this
+development branch rather than the `2.6.5` registry release; use the development build
+for the exact walkthrough below or wait for the next release.
 
 ## Quick start (verified, 5 minutes)
 
