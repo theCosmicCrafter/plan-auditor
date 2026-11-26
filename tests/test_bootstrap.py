@@ -193,8 +193,7 @@ def test_python_template_can_activate_and_seal(tmp_path: Path, capfd) -> None:
     assert main(["plan", "verify", str(workspace)]) == 0
     capfd.readouterr()
     plan = json.loads((workspace / ".plan-auditor" / "plan.json").read_text(encoding="utf-8"))
-    assert plan["steps"][0]["verify"][0]["argv"][1:] == ["-m", "pytest"]
-    assert len(plan["steps"][0]["verify"][0]["argv"]) == 3
+    assert plan["steps"][0]["verify"][0]["argv"] == ["pytest"]
 
 
 def test_init_workspace_does_not_add_default_plan_beside_named_plans(tmp_path: Path) -> None:

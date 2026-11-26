@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -23,10 +22,9 @@ def _timestamp() -> str:
 
 
 def python_pytest_template() -> tuple[dict[str, Any], dict[str, Any]]:
-    # Use the environment's Python rather than the auditor executable so a
-    # pipx-installed auditor can still test a project virtual environment.
-    python = shutil.which("python") or shutil.which("python3") or sys.executable
-    check = {"type": "exec", "argv": [python, "-m", "pytest"], "expect_exit": 0}
+    # Resolve pytest at verification time rather than baking in the auditor or
+    # bootstrap-time interpreter; an activated project virtualenv can then win.
+    check = {"type": "exec", "argv": ["pytest"], "expect_exit": 0}
     plan = {
         "task": "Prove the Python test suite passes",
         "created": _timestamp(),
