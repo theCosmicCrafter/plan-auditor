@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -256,3 +259,52 @@ def test_hook_commands_use_powershell_call_operator_and_quote_cmd_metacharacters
     quoted_target = host_install._cmd_quote(str(Path(result["target"]) / "hooks" / "gate_hook.py"))
     assert quoted_target.startswith('"') and quoted_target.endswith('"')
     assert quoted_target in commands["cmd"]
+
+
+def _write_argv_printer(tmp_path: Path) -> Path:
+    directory = tmp_path / "shell & args"
+    directory.mkdir()
+    script = directory / "print_args.py"
+    script.write_text(
+        "import json, sys\nprint(json.dumps(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+    return script
+
+
+def _run_shell_command(command: list[str]) -> list[str]:
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stderr
+    return json.loads(completed.stdout)
+
+
+def test_posix_hook_quoting_preserves_arguments(tmp_path: Path) -> None:
+    if os.name == "nt" or shutil.which("sh") is None:
+        pytest.skip("POSIX shell unavailable")
+    script = _write_argv_printer(tmp_path)
+    sentinel = "<workspace> & uncut"
+    argv = [sys.executable, str(script), sentinel]
+    assert _run_shell_command(["sh", "-c", shlex.join(argv)]) == [sentinel]
+
+
+def test_powershell_hook_quoting_preserves_arguments(tmp_path: Path) -> None:
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if shell is None:
+        pytest.skip("PowerShell unavailable")
+    script = _write_argv_printer(tmp_path)
+    sentinel = "<workspace> & uncut 'quoted'"
+    argv = [sys.executable, str(script), sentinel]
+    command = "& " + " ".join(host_install._powershell_quote(item) for item in argv)
+    assert _run_shell_command([shell, "-NoProfile", "-Command", command]) == [sentinel]
+
+
+def test_cmd_hook_quoting_preserves_arguments(tmp_path: Path) -> None:
+    if os.name != "nt":
+        pytest.skip("Command Prompt unavailable")
+    script = _write_argv_printer(tmp_path)
+    sentinel = "<workspace> & uncut"
+    argv = [sys.executable, str(script), sentinel]
+    command = " ".join(host_install._cmd_quote(item) for item in argv)
+    batch = tmp_path / "run-hook.bat"
+    batch.write_text("@echo off\n" + command + "\n", encoding="utf-8")
+    assert _run_shell_command(["cmd.exe", "/c", str(batch)]) == [sentinel]

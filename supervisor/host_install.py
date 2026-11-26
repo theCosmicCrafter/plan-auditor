@@ -134,6 +134,10 @@ def _install_file(source: Path, target: Path, *, boundary: Path, dry_run: bool) 
     return operation
 
 
+def _powershell_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
 def _cmd_quote(value: str) -> str:
     quoted = subprocess.list2cmdline([value])
     if any(char in value for char in "&|%<>^") and not (
@@ -175,7 +179,7 @@ def install_skill(
     hook_commands = {
         "argv": hook_argv,
         "posix": shlex.join(hook_argv),
-        "powershell": "& " + " ".join("'" + item.replace("'", "''") + "'" for item in hook_argv),
+        "powershell": "& " + " ".join(_powershell_quote(item) for item in hook_argv),
         "cmd": " ".join(_cmd_quote(item) for item in hook_argv),
     }
     return {
