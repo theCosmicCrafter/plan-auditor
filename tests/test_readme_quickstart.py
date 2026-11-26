@@ -137,8 +137,10 @@ def test_readme_quickstart_commands_really_run_and_pass(
         observed.append(capfd.readouterr().out)
         if command == "plan-auditor run . 1":
             pre_integrity_code = main(["audit", str(workspace)])
-            capfd.readouterr()
+            pre_integrity_output = capfd.readouterr()
             assert pre_integrity_code != 0, "keyless evidence must fail closed before integrity init"
+            diagnostic = pre_integrity_output.out + pre_integrity_output.err
+            assert "evidence is not authenticated" in diagnostic
     captured = _mask("".join(observed))
     assert code == 0, (
         "the documented quick start must end with `plan-auditor audit` exiting 0\n"
