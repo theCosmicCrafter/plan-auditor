@@ -34,8 +34,14 @@ it builds contains them via `.github/scripts/check_dist_assets.py`.
 |---|---|---|---|
 | Command Code | `~/.commandcode/skills/plan-auditor/` | `.commandcode/skills/plan-auditor/` | `/plan-auditor` |
 | Claude Code | `~/.claude/skills/plan-auditor/` | `.claude/skills/plan-auditor/` | `/plan-auditor` |
-| Codex CLI | `~/.codex/skills/plan-auditor/` | `.codex/skills/plan-auditor/` | `$plan-auditor` |
+| Codex CLI | `~/.agents/skills/plan-auditor/` | `.agents/skills/plan-auditor/` | `$plan-auditor` |
 | OpenCode | `~/.config/opencode/skills/plan-auditor/` | `.opencode/skills/plan-auditor/` | `/plan-auditor` |
+
+The Codex and OpenCode rows follow the current
+[Codex customization](https://learn.chatgpt.com/docs/customization/overview) and
+[OpenCode skills](https://opencode.ai/docs/skills/) documentation: Codex uses
+`.agents/skills`, while OpenCode uses `.opencode/skills` for project skills and
+`~/.config/opencode/skills` for user skills.
 
 Start a new host-tool session after installing/changing skills if that host only
 discovers skills at startup.

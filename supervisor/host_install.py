@@ -10,10 +10,18 @@ from typing import Any
 
 HOST_PATHS = {
     "claude": (".claude", "skills", "plan-auditor"),
-    "codex": (".codex", "skills", "plan-auditor"),
+    "codex": (".agents", "skills", "plan-auditor"),
     "opencode": (".config", "opencode", "skills", "plan-auditor"),
     "commandcode": (".commandcode", "skills", "plan-auditor"),
 }
+
+HOST_PROJECT_PATHS = {
+    **HOST_PATHS,
+    "opencode": (".opencode", "skills", "plan-auditor"),
+}
+# Codex intentionally uses the same `.agents/skills` location for user and
+# project scopes; OpenCode uses its native project location instead of the
+# user-level `.config` path.
 
 HOST_ROOT_MARKERS = {
     "claude": (".claude",),
@@ -41,7 +49,7 @@ def host_target(
         raise InstallSkillError(f"unsupported host: {host}")
     if scope not in {"user", "project"}:
         raise InstallSkillError(f"unsupported scope: {scope}")
-    parts = HOST_PATHS[host]
+    parts = HOST_PATHS[host] if scope == "user" else HOST_PROJECT_PATHS[host]
     if scope == "user":
         base = Path(home).expanduser() if home is not None else Path.home()
     else:

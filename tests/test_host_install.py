@@ -26,7 +26,7 @@ def test_host_target_matrix_user_and_project(tmp_path: Path) -> None:
     home = tmp_path / "home"
     project = tmp_path / "project"
     assert host_target("claude", "user", home=home) == home / ".claude" / "skills" / "plan-auditor"
-    assert host_target("codex", "user", home=home) == home / ".codex" / "skills" / "plan-auditor"
+    assert host_target("codex", "user", home=home) == home / ".agents" / "skills" / "plan-auditor"
     assert (
         host_target("opencode", "user", home=home)
         == home / ".config" / "opencode" / "skills" / "plan-auditor"
@@ -38,6 +38,14 @@ def test_host_target_matrix_user_and_project(tmp_path: Path) -> None:
     assert (
         host_target("claude", "project", directory=project, home=home)
         == project.resolve() / ".claude" / "skills" / "plan-auditor"
+    )
+    assert (
+        host_target("codex", "project", directory=project, home=home)
+        == project.resolve() / ".agents" / "skills" / "plan-auditor"
+    )
+    assert (
+        host_target("opencode", "project", directory=project, home=home)
+        == project.resolve() / ".opencode" / "skills" / "plan-auditor"
     )
     for host in HOST_PATHS:
         assert host_target(host, "user", home=home).name == "plan-auditor"
@@ -77,7 +85,7 @@ def test_install_skill_copies_assets_and_is_idempotent(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
     result = install_skill("codex", scope="project", directory=project)
-    target = project / ".codex" / "skills" / "plan-auditor"
+    target = project / ".agents" / "skills" / "plan-auditor"
     assert result["changed"] == len(result["operations"])
     assert (target / "SKILL.md").is_file()
     assert (target / "hooks" / "gate_hook.py").is_file()
