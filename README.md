@@ -76,8 +76,10 @@ two files verbatim — `request-source.json` is the input to the `request_sha256
 **1. Create the project and the plan.**
 
 ```bash
-mkdir plan-auditor-demo && cd plan-auditor-demo
+mkdir plan-auditor-demo
+cd plan-auditor-demo
 mkdir .plan-auditor
+python -c "from pathlib import Path; Path('README.md').write_text('# Demo project\n', encoding='utf-8')"
 ```
 
 `.plan-auditor/plan.json`, and `request-source.json` beside it — the host-owned
@@ -123,11 +125,16 @@ plan-auditor run . 1
 # is only tamper-evident — anyone with write access can rebuild it — so the
 # gate never treats it as proof. Generate the key OUTSIDE the workspace and
 # point the environment at it:
-python -c "import os, pathlib; d = pathlib.Path.home()/'.plan-auditor'; d.mkdir(exist_ok=True); (d/'plan-auditor-hmac.key').write_bytes(b'plan-auditor: ' + os.urandom(48))"
+python -c "import os, pathlib; p = pathlib.Path.home()/'.plan-auditor'/'plan-auditor-hmac.key'; p.parent.mkdir(exist_ok=True); fd = os.open(p, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600); os.write(fd, b'plan-auditor: ' + os.urandom(48)); os.close(fd)"
 export PLAN_AUDITOR_HMAC_KEY_FILE="$HOME/.plan-auditor/plan-auditor-hmac.key"
 plan-auditor integrity init .
 plan-auditor audit .
 ```
+
+The setup commands avoid `&&`, so they can be pasted into either Bash or Windows
+PowerShell. The key-generation command uses `O_EXCL`: it refuses to overwrite an
+existing key. Reuse an existing key; replacing it invalidates authentication for
+workspaces signed with the old key unless you deliberately re-authenticate them.
 
 On Windows PowerShell, use the same Python key-generation command, then set the
 environment variable with:
@@ -138,6 +145,8 @@ $env:PLAN_AUDITOR_HMAC_KEY_FILE = "$HOME\.plan-auditor\plan-auditor-hmac.key"
 
 Use either the Bash `export` or the PowerShell assignment, not both. In both cases
 the key file is outside the workspace; do not commit or copy it into the project.
+On POSIX the key is created with mode `0600`; on Windows it remains protected by
+the user profile and directory ACLs rather than POSIX mode bits.
 
 Real output. A lone `...` marks fields omitted for length; every other line is verbatim,
 and every JSON level that is not elided lists exactly the keys the tool emits.
