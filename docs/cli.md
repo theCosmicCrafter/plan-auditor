@@ -121,7 +121,7 @@ plan-auditor install-skill --host claude --scope user
 plan-auditor install-skill --host codex --scope project --dir . --dry-run
 ```
 
-Supported hosts are `claude`, `codex`, `opencode`, and `commandcode`. The command copies `SKILL.md`, `hooks/`, `references/`, and the runtime `scripts/` modules into the documented host skill directory. Identical files are left unchanged; differing files are backed up beside the target before replacement. The JSON output lists every source, target, and backup path plus the hook command to configure manually in hosts whose settings format is not known.
+Supported hosts are `claude`, `codex`, `opencode`, and `commandcode`. The command copies `SKILL.md`, `hooks/`, `references/`, and the runtime `scripts/` modules into the documented host skill directory. Identical files are left unchanged; differing files are backed up beside the target before replacement. The JSON output lists every source, target, and backup path plus shell-specific `hook_commands` (`posix`, `powershell`, `cmd`, and argument-vector form) to configure manually in hosts whose settings format is not known. Command Code output uses the blocking `scripts/stop_gate.py` adapter; other hosts use `hooks/gate_hook.py`.
 
 ## Traffic evidence
 

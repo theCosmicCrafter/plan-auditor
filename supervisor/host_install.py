@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import shlex
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -51,7 +54,7 @@ def host_target(
         raise InstallSkillError(f"unsupported scope: {scope}")
     parts = HOST_PATHS[host] if scope == "user" else HOST_PROJECT_PATHS[host]
     if scope == "user":
-        base = Path(home).expanduser() if home is not None else Path.home()
+        base = (Path(home).expanduser() if home is not None else Path.home()).resolve()
     else:
         base = Path(directory).expanduser().resolve()
     return base.joinpath(*parts)
@@ -99,7 +102,18 @@ def _unique_backup(path: Path) -> Path:
     return candidate
 
 
-def _install_file(source: Path, target: Path, *, dry_run: bool) -> dict[str, Any]:
+def _reject_symlinked_install_path(root: Path, target: Path) -> None:
+    if root.is_symlink():
+        raise InstallSkillError(f"refusing to follow installation symlink: {root}")
+    current = root
+    for part in target.relative_to(root).parts:
+        current = current / part
+        if current.is_symlink():
+            raise InstallSkillError(f"refusing to follow installation symlink: {current}")
+
+
+def _install_file(source: Path, target: Path, *, boundary: Path, dry_run: bool) -> dict[str, Any]:
+    _reject_symlinked_install_path(boundary, target)
     operation: dict[str, Any] = {"source": str(source), "target": str(target)}
     if target.exists() and target.read_bytes() == source.read_bytes():
         operation["action"] = "unchanged"
@@ -129,14 +143,30 @@ def install_skill(
     home: str | Path | None = None,
 ) -> dict[str, Any]:
     target = host_target(host, scope, directory, home)
+    base = (
+        (Path(home).expanduser() if home is not None else Path.home()).resolve()
+        if scope == "user"
+        else Path(directory).expanduser().resolve()
+    )
     root = skill_asset_root()
     assets = _iter_asset_files(root)
     if not assets:
         raise InstallSkillError(f"no skill assets found under {root}")
     operations = [
-        _install_file(source, target / relative, dry_run=dry_run) for source, relative in assets
+        _install_file(source, target / relative, boundary=base, dry_run=dry_run)
+        for source, relative in assets
     ]
     changed = [item for item in operations if item["action"] != "unchanged"]
+    if host == "commandcode":
+        hook_argv = [sys.executable, str(target / "scripts" / "stop_gate.py")]
+    else:
+        hook_argv = [sys.executable, str(target / "hooks" / "gate_hook.py"), "<workspace>"]
+    hook_commands = {
+        "argv": hook_argv,
+        "posix": shlex.join(hook_argv),
+        "powershell": " ".join("'" + item.replace("'", "''") + "'" for item in hook_argv),
+        "cmd": subprocess.list2cmdline(hook_argv),
+    }
     return {
         "host": host,
         "scope": scope,
@@ -146,7 +176,8 @@ def install_skill(
         "operations": operations,
         "changed": len(changed),
         "unchanged": len(operations) - len(changed),
-        "hook_command": f'"{sys.executable}" "{target / "hooks" / "gate_hook.py"}" "<workspace>"',
+        "hook_command": hook_commands["cmd" if os.name == "nt" else "posix"],
+        "hook_commands": hook_commands,
         "settings_modified": False,
         "settings_note": "host settings are not modified automatically; configure the printed hook command in the host if desired",
     }

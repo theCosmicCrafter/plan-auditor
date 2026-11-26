@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shlex
 from pathlib import Path
 
 import pytest
@@ -76,7 +78,8 @@ def test_install_skill_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert result["changed"] > 0
     assert all(item["action"].startswith("planned-") for item in result["operations"])
     assert not (project / ".claude").exists()
-    assert result["hook_command"].startswith('"')
+    assert result["hook_commands"]["posix"] == shlex.join(result["hook_commands"]["argv"])
+    assert result["hook_command"] == result["hook_commands"]["cmd" if os.name == "nt" else "posix"]
     assert "gate_hook.py" in result["hook_command"]
     assert result["settings_modified"] is False
 
@@ -203,3 +206,38 @@ def test_install_skill_cli_error_is_fail_closed(tmp_path: Path, monkeypatch, cap
     payload = json.loads(capfd.readouterr().out)
     assert payload["installed"] is False
     assert "copy failed" in payload["error"]
+
+
+def test_commandcode_hook_uses_blocking_stop_adapter(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    result = install_skill("commandcode", scope="project", directory=project, dry_run=True)
+    argv = result["hook_commands"]["argv"]
+    assert argv[1].endswith(str(Path("scripts") / "stop_gate.py"))
+    assert "<workspace>" not in argv
+
+
+def test_install_skill_refuses_symlinked_project_components(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    outside = tmp_path / "outside"
+    project.mkdir()
+    outside.mkdir()
+    try:
+        (project / ".claude").symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation unavailable")
+    with pytest.raises(InstallSkillError, match="refusing to follow installation symlink"):
+        install_skill("claude", scope="project", directory=project, dry_run=True)
+    assert not (outside / "SKILL.md").exists()
+
+
+def test_reject_symlinked_install_path_refuses_boundary_symlink(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    boundary = tmp_path / "boundary"
+    try:
+        boundary.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation unavailable")
+    with pytest.raises(InstallSkillError, match="refusing to follow installation symlink"):
+        host_install._reject_symlinked_install_path(boundary, boundary / "SKILL.md")
