@@ -361,6 +361,17 @@ class TestUninstallTrust:
         assert str(legacy) in removals
         assert real_ca.fingerprint().lower() in removals[0]
 
+    def test_linux_preserves_a_different_legacy_fixed_name(self, real_ca, tmp_path, monkeypatch):
+        monkeypatch.setattr(certs, "_LINUX_CERT_DIR", tmp_path)
+        legacy = tmp_path / "plan-auditor-traffic.crt"
+        legacy.write_text("different workspace certificate\n", encoding="utf-8")
+        runner = FakeRunner(returncodes=[0, 0, 1])
+        ok, detail = uninstall_trust(real_ca.cert_path, runner=runner, platform="linux")
+        assert ok and "removed from the system CA bundle" in detail
+        removals = [call[2] for call in runner.calls if call[0] == "rm"]
+        assert str(legacy) not in removals
+        assert len(removals) == 1
+
     def test_linux_remove_failure(self, real_ca):
         ok, detail = uninstall_trust(
             real_ca.cert_path, runner=FakeRunner(fail_on="rm"), platform="linux"
