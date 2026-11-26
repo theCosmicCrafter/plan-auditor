@@ -72,6 +72,8 @@ def test_init_workspace_validates_profile_mode_and_template(tmp_path: Path) -> N
         init_workspace(workspace, host="none", mode="invalid")
     with pytest.raises(BootstrapError, match="unsupported template"):
         template_documents("unknown")
+    with pytest.raises(BootstrapError, match="unsupported host"):
+        init_workspace(workspace, host="unknown")
 
 
 def test_generic_template_is_behavioral() -> None:
@@ -140,3 +142,39 @@ def test_init_cli_json_human_and_error(tmp_path: Path, capfd) -> None:
     assert main(["init", str(tmp_path / "missing"), "--json"]) == 2
     error = capfd.readouterr().out
     assert "directory not found" in error
+
+
+def test_init_cli_human_reports_key_hooks_and_warnings(tmp_path: Path, capfd) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    key = tmp_path / "hmac.key"
+    assert (
+        main(
+            [
+                "init",
+                str(workspace),
+                "--host",
+                "claude",
+                "--create-key",
+                "--key-out",
+                str(key),
+                "--install-hooks",
+                "--hook-scope",
+                "project",
+            ]
+        )
+        == 0
+    )
+    human = capfd.readouterr().out
+    assert "HMAC key:" in human
+    assert "Bash: export PLAN_AUDITOR_HMAC_KEY_FILE=" in human
+    assert "PowerShell: $env:PLAN_AUDITOR_HMAC_KEY_FILE" in human
+    assert "Skill assets:" in human
+    assert "Hook command:" in human
+    assert "Request contract not activated" in human
+
+    other = tmp_path / "other"
+    other.mkdir()
+    assert main(["init", str(other), "--host", "none", "--install-hooks"]) == 0
+    warning = capfd.readouterr().out
+    assert "WARNING: no supported host directory detected" in warning

@@ -143,3 +143,41 @@ def test_keygen_cli_success_and_error_do_not_print_key(tmp_path: Path, capfd) ->
     failure = capfd.readouterr().out
     assert "outside the workspace" in failure
     assert out.read_bytes().strip().decode("ascii") not in failure
+
+
+def test_default_key_path_is_in_user_plan_auditor_directory() -> None:
+    path = keygen.default_key_path()
+    assert path.name == "plan-auditor-hmac.key"
+    assert path.parent.name == ".plan-auditor"
+
+
+def test_inside_returns_false_for_incompatible_paths(monkeypatch) -> None:
+    def incompatible(_paths):
+        raise ValueError("different drives")
+
+    monkeypatch.setattr(keygen.os.path, "commonpath", incompatible)
+    assert keygen._inside(Path("root"), Path("candidate")) is False
+
+
+def test_validate_existing_wraps_read_errors(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "hmac.key"
+    path.write_bytes(b"a" * 64)
+    real_read_bytes = Path.read_bytes
+
+    def fail_read_bytes(self, *args, **kwargs):
+        if self == path:
+            raise OSError("denied")
+        return real_read_bytes(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read_bytes)
+    with pytest.raises(KeygenError, match="cannot read existing HMAC key"):
+        keygen._validate_existing(path, strict=False, platform="linux")
+
+
+def test_validate_existing_accepts_strict_private_posix_permissions(
+    tmp_path: Path, monkeypatch
+) -> None:
+    path = tmp_path / "hmac.key"
+    path.write_bytes(b"a" * 64)
+    monkeypatch.setattr(keygen.stat, "S_IMODE", lambda _mode: 0o600)
+    keygen._validate_existing(path, strict=True, platform="linux")
