@@ -98,12 +98,17 @@ def generate_key_file(
             "environment": environment_instructions(path),
         }
     else:
+        parent_existed = path.parent.exists()
         path.parent.mkdir(parents=True, exist_ok=True)
-        if not platform.startswith("win") and path.parent.name == ".plan-auditor":
+        if (
+            not parent_existed
+            and not platform.startswith("win")
+            and path.parent.name == ".plan-auditor"
+        ):
             os.chmod(path.parent, 0o700)
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-        if hasattr(os, "O_BINARY"):
-            flags |= os.O_BINARY
+        if platform.startswith("win"):
+            flags |= getattr(os, "O_BINARY", 0)
         try:
             fd = os.open(path, flags, 0o600)
         except FileExistsError:

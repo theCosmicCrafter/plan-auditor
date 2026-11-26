@@ -181,3 +181,25 @@ def test_validate_existing_accepts_strict_private_posix_permissions(
     path.write_bytes(b"a" * 64)
     monkeypatch.setattr(keygen.stat, "S_IMODE", lambda _mode: 0o600)
     keygen._validate_existing(path, strict=True, platform="linux")
+
+
+def test_generate_key_file_preserves_an_existing_shared_parent(tmp_path: Path, monkeypatch) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    parent = tmp_path / ".plan-auditor"
+    parent.mkdir()
+
+    def fail_chmod(*_args, **_kwargs):
+        raise AssertionError("existing parent permissions must not be changed")
+
+    monkeypatch.setattr(keygen.os, "chmod", fail_chmod)
+    result = generate_key_file(parent / "hmac.key", workspace=workspace, platform="linux")
+    assert result["created"] is True
+
+
+def test_generate_key_file_windows_branch_uses_binary_flag_when_available(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    result = generate_key_file(tmp_path / "hmac.key", workspace=workspace, platform="win32")
+    assert result["created"] is True
+    assert result["permissions"] == "windows-acl"
