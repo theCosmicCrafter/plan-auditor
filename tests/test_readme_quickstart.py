@@ -294,6 +294,12 @@ def test_docs_quickstart_uses_the_same_command_sequence(quickstart: dict) -> Non
     assert commands == quickstart["commands"]
 
 
+def test_demo_readme_creation_refuses_to_overwrite() -> None:
+    for path in (ROOT / "README.md", ROOT / "docs" / "quickstart.md"):
+        text = path.read_text(encoding="utf-8")
+        assert "Path('README.md').open('x', encoding='utf-8')" in text
+
+
 def test_readme_quickstart_transcript_covers_every_documented_command(
     quickstart: dict,
 ) -> None:

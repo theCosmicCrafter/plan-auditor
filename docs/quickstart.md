@@ -53,7 +53,7 @@ that sequence and compares the transcript against real output.
 mkdir plan-auditor-demo
 cd plan-auditor-demo
 mkdir .plan-auditor
-python -c "from pathlib import Path; Path('README.md').write_text('# Demo project\n', encoding='utf-8')"
+python -c "from pathlib import Path; f = Path('README.md').open('x', encoding='utf-8'); f.write('# Demo project\n'); f.close()"
 ```
 
 `.plan-auditor/plan.json`, and `request-source.json` beside it — the host-owned
