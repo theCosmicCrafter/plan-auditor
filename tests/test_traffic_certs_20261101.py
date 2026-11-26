@@ -266,6 +266,8 @@ class TestInstallTrust:
         ok, detail = install_trust(real_ca.cert_path, runner=runner, platform="linux")
         assert ok and "system CA bundle" in detail
         assert runner.calls[0][0] == "cp"
+        assert real_ca.fingerprint().lower() in runner.calls[0][2]
+        assert runner.calls[0][2] != "/usr/local/share/ca-certificates/plan-auditor-traffic.crt"
         assert runner.calls[1] == ["update-ca-certificates"]
 
     def test_linux_copy_failure(self, real_ca):
@@ -345,7 +347,30 @@ class TestUninstallTrust:
         runner = FakeRunner(returncodes=[0, 0, 1])
         ok, detail = uninstall_trust(real_ca.cert_path, runner=runner, platform="linux")
         assert ok and "removed from the system CA bundle" in detail
+        assert real_ca.fingerprint().lower() in runner.calls[0][2]
         assert runner.calls[1] == ["update-ca-certificates", "--fresh"]
+
+    def test_linux_removes_matching_legacy_fixed_name(self, real_ca, tmp_path, monkeypatch):
+        monkeypatch.setattr(certs, "_LINUX_CERT_DIR", tmp_path)
+        legacy = tmp_path / "plan-auditor-traffic.crt"
+        legacy.write_bytes(real_ca.cert_path.read_bytes())
+        runner = FakeRunner(returncodes=[0, 0, 0, 1])
+        ok, detail = uninstall_trust(real_ca.cert_path, runner=runner, platform="linux")
+        assert ok and "removed from the system CA bundle" in detail
+        removals = [call[2] for call in runner.calls if call[0] == "rm"]
+        assert str(legacy) in removals
+        assert real_ca.fingerprint().lower() in removals[0]
+
+    def test_linux_preserves_a_different_legacy_fixed_name(self, real_ca, tmp_path, monkeypatch):
+        monkeypatch.setattr(certs, "_LINUX_CERT_DIR", tmp_path)
+        legacy = tmp_path / "plan-auditor-traffic.crt"
+        legacy.write_text("different workspace certificate\n", encoding="utf-8")
+        runner = FakeRunner(returncodes=[0, 0, 1])
+        ok, detail = uninstall_trust(real_ca.cert_path, runner=runner, platform="linux")
+        assert ok and "removed from the system CA bundle" in detail
+        removals = [call[2] for call in runner.calls if call[0] == "rm"]
+        assert str(legacy) not in removals
+        assert len(removals) == 1
 
     def test_linux_remove_failure(self, real_ca):
         ok, detail = uninstall_trust(

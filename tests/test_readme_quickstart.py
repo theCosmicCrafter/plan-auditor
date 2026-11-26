@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from supervisor import keygen
 from supervisor.cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,12 +107,19 @@ def _install_hmac_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     file form is the only configuration in effect.
     """
     key_file = tmp_path / "quickstart-hmac.key"
-    # Fixed printable key: load_key strips whitespace, so any leading or
-    # trailing whitespace byte from os.urandom could drop it below the 32
-    # bytes the loader requires and the failure would look nondeterministic.
-    key_file.write_bytes(b"plan-auditor-quickstart-test-key-material-0123456789abcdef")
     monkeypatch.delenv("PLAN_AUDITOR_HMAC_KEY", raising=False)
     monkeypatch.setenv("PLAN_AUDITOR_HMAC_KEY_FILE", str(key_file))
+
+
+def _run_quickstart_command(
+    command: str, workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> int:
+    if command.startswith("plan-auditor integrity keygen"):
+        key_file = tmp_path / "quickstart-hmac.key"
+        monkeypatch.setattr(keygen, "default_key_path", lambda: key_file)
+    if command.startswith("plan-auditor integrity init"):
+        _install_hmac_key(tmp_path, monkeypatch)
+    return main(_argv(command, workspace))
 
 
 def test_readme_quickstart_commands_really_run_and_pass(
@@ -122,17 +130,24 @@ def test_readme_quickstart_commands_really_run_and_pass(
         "plan-auditor request init . --file request-source.json",
         "plan-auditor plan verify .",
         "plan-auditor run . 1",
+        "plan-auditor integrity keygen .",
         "plan-auditor integrity init .",
         "plan-auditor audit .",
     ], "quick start command list changed; keep it in sync with the transcript"
 
+    monkeypatch.delenv("PLAN_AUDITOR_HMAC_KEY", raising=False)
+    monkeypatch.delenv("PLAN_AUDITOR_HMAC_KEY_FILE", raising=False)
     workspace = _workspace(tmp_path, quickstart)
     observed: list[str] = []
     for command in commands:
-        if command.startswith("plan-auditor integrity init"):
-            _install_hmac_key(tmp_path, monkeypatch)
-        code = main(_argv(command, workspace))
+        code = _run_quickstart_command(command, workspace, tmp_path, monkeypatch)
         observed.append(capfd.readouterr().out)
+        if command == "plan-auditor run . 1":
+            pre_integrity_code = main(["audit", str(workspace)])
+            pre_integrity_output = capfd.readouterr()
+            assert pre_integrity_code != 0, "keyless evidence must fail closed before integrity init"
+            diagnostic = pre_integrity_output.out + pre_integrity_output.err
+            assert "evidence is not authenticated" in diagnostic
     captured = _mask("".join(observed))
     assert code == 0, (
         "the documented quick start must end with `plan-auditor audit` exiting 0\n"
@@ -208,9 +223,7 @@ def test_readme_quickstart_hashes_are_not_normalised_away(
     workspace = _workspace(tmp_path, quickstart)
     observed: list[str] = []
     for command in quickstart["commands"]:
-        if command.startswith("plan-auditor integrity init"):
-            _install_hmac_key(tmp_path, monkeypatch)
-        main(_argv(command, workspace))
+        _run_quickstart_command(command, workspace, tmp_path, monkeypatch)
         observed.append(capfd.readouterr().out)
     verbatim = "".join(observed).replace("\r\n", "\n")
 
@@ -239,9 +252,7 @@ def test_readme_quickstart_json_keys_match_the_real_output(
     workspace = _workspace(tmp_path, quickstart)
     observed: list[str] = []
     for command in quickstart["commands"]:
-        if command.startswith("plan-auditor integrity init"):
-            _install_hmac_key(tmp_path, monkeypatch)
-        main(_argv(command, workspace))
+        _run_quickstart_command(command, workspace, tmp_path, monkeypatch)
         observed.append(capfd.readouterr().out)
 
     documented_chunks = _chunks_by_command("\n".join(quickstart["transcript"]))
@@ -273,6 +284,39 @@ def test_readme_quickstart_json_keys_match_the_real_output(
     assert not problems, "README JSON shape does not match real output:\n  " + "\n  ".join(
         problems
     )
+
+
+def test_docs_quickstart_uses_the_same_command_sequence(quickstart: dict) -> None:
+    document = (ROOT / "docs" / "quickstart.md").read_text(encoding="utf-8")
+    section = document.split("\n## Your first verified task", 1)[1].split("\n## ", 1)[0]
+    commands = [
+        line.strip()
+        for info, body in _fences(section)
+        if info == "bash"
+        for line in body
+        if line.strip().startswith("plan-auditor ")
+    ]
+    assert commands == quickstart["commands"]
+
+
+def test_shell_specific_key_configuration_precedes_integrity_init() -> None:
+    for path in (ROOT / "README.md", ROOT / "docs" / "quickstart.md"):
+        text = path.read_text(encoding="utf-8")
+        powershell = re.search(r"```powershell\n(.*?)\n```", text, re.DOTALL)
+        assert powershell, f"{path.name} must keep a PowerShell environment block"
+        block = powershell.group(1)
+        assert "$env:PLAN_AUDITOR_HMAC_KEY_FILE" in block
+        assert block.index("$env:PLAN_AUDITOR_HMAC_KEY_FILE") < block.index(
+            "plan-auditor integrity init"
+        )
+        assert block.index("plan-auditor integrity init") < block.index("plan-auditor audit .")
+        assert "export PLAN_AUDITOR_HMAC_KEY_FILE" not in block
+
+
+def test_demo_readme_creation_refuses_to_overwrite() -> None:
+    for path in (ROOT / "README.md", ROOT / "docs" / "quickstart.md"):
+        text = path.read_text(encoding="utf-8")
+        assert "Path('README.md').open('x', encoding='utf-8')" in text
 
 
 def test_readme_quickstart_transcript_covers_every_documented_command(

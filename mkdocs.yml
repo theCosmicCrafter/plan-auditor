@@ -43,6 +43,7 @@ nav:
   - Security:
       - Threat model: threat-model.md
       - Deployment isolation: deployment-isolation.md
+      - Traffic evidence: traffic.md
   - Integrations: integrations.md
   - Release status: release-status.md
   - Evidence and claims: benchmark.md

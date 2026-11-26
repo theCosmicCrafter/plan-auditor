@@ -88,7 +88,7 @@ def test_the_direct_script_path_rejects_a_plan_over_the_bound(tmp_path: Path):
     with pytest.raises(SystemExit) as caught:
         load_plan(str(tmp_path))
     message = str(caught.value)
-    assert "plan cok buyuk" in message, message
+    assert "plan too large" in message, message
     assert str(MAX_PLAN_BYTES) in message, message
 
 

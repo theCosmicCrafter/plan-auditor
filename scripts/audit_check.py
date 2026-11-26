@@ -31,6 +31,11 @@ import zipfile
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, NoReturn
 
+try:
+    from scripts.console import configure_console_output
+except ImportError:
+    from console import configure_console_output
+
 if TYPE_CHECKING:  # pragma: no cover - type checkers see the single package import
     from scripts.check_isolation import check_launch_options
     from scripts.contract import PlanTrustError
@@ -352,18 +357,18 @@ def load_plan(base, name=None):
     try:
         path = plan_path(base, name)
     except ValueError as exc:
-        sys.exit("HATA: %s" % exc)
+        sys.exit("ERROR: %s" % exc)
     if not os.path.isfile(path):
         where = path if not name else "%s (--plan %s)" % (path, name)
-        sys.exit("HATA: plan yok: %s" % where)
+        sys.exit("ERROR: plan not found: %s" % where)
     # The plan is untrusted input, so it is bounded before it is parsed. See
     # ``supervisor.plans.MAX_PLAN_BYTES``: the same bound the trusted read path
     # uses, so both paths accept the same plans instead of disagreeing.
     size = os.path.getsize(path)
     if size > MAX_PLAN_BYTES:
         sys.exit(
-            f"HATA: plan cok buyuk: {path} ({size} bayt, sinir {MAX_PLAN_BYTES} bayt); "
-            "plani kucultun veya adlandirilmis planlara bolun"
+            f"ERROR: plan too large: {path} ({size} bytes, limit {MAX_PLAN_BYTES} bytes); "
+            "shrink the plan or split it into named plans"
         )
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
@@ -1936,7 +1941,7 @@ def audit_steps(base, plan, ids=None, mode="run", name=None, force=False):
         selected = set(ids)
         unknown = sorted(selected - set(by_id))
         if unknown:
-            sys.exit("HATA: verilen id'ler planda yok: %s" % unknown)
+            sys.exit("ERROR: step id(s) not present in plan: %s" % unknown)
         if not selected:
             return True
     target = [by_id[sid] for sid in order if sid in selected]
@@ -2095,7 +2100,7 @@ def cmd_validate(args):
     try:
         _validated_runtime_config(args.dir)
     except ValueError as exc:
-        print("CONFIG HATASI: %s" % exc)
+        print("CONFIG ERROR: %s" % exc)
         return 1
     plan = load_plan(args.dir, args.plan)
     errs = validate_plan(plan)
@@ -2112,7 +2117,7 @@ def cmd_run(args):
     try:
         _validated_runtime_config(args.dir)
     except ValueError as exc:
-        print("CONFIG HATASI: %s" % exc)
+        print("CONFIG ERROR: %s" % exc)
         return 2
     ok, _count, problem = verify_chain(args.dir)
     if not ok:
@@ -2142,7 +2147,7 @@ def cmd_audit(args):
     try:
         _validated_runtime_config(args.dir)
     except ValueError as exc:
-        print("CONFIG HATASI: %s" % exc)
+        print("CONFIG ERROR: %s" % exc)
         return 2
     ok, _count, problem = verify_chain(args.dir)
     if not ok:
@@ -2226,18 +2231,13 @@ def cmd_rollback(args):
 
 
 def main():
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError):
-            # Streams without reconfigure() keep their default encoding.
-            pass
+    configure_console_output()
 
     parser = argparse.ArgumentParser(description="Plan Auditor deterministic core")
     sub = parser.add_subparsers(dest="mode", required=True)
     for name in ("validate", "run", "audit", "status", "snapshot", "rollback"):
         item = sub.add_parser(name)
-        item.add_argument("dir", nargs="?", default=".", help="proje dizini")
+        item.add_argument("dir", nargs="?", default=".", help="project directory")
         item.add_argument("--plan", help="plan name (.plan-auditor/plans/<name>.json); default: plan.json")
         if name == "run":
             item.add_argument("ids", nargs="*", type=int, help="step ids to audit")
@@ -2248,12 +2248,12 @@ def main():
     args = parser.parse_args()
     args.dir = os.path.abspath(args.dir)
     if not os.path.isdir(args.dir):
-        sys.exit("HATA: dizin yok: %s" % args.dir)
+        sys.exit("ERROR: directory not found: %s" % args.dir)
     if getattr(args, "plan", None):
         try:
             validate_plan_name(args.plan)
         except ValueError as exc:
-            print("HATA: %s" % exc, file=sys.stderr)
+            print("ERROR: %s" % exc, file=sys.stderr)
             return 1
     return {
         "validate": cmd_validate,

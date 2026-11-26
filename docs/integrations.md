@@ -11,31 +11,37 @@ The gate evaluates every active default/named plan and does not trust persisted
 
 The skill is four things: `SKILL.md`, `scripts/`, `references/` and `hooks/`.
 
-**From a checkout** — always works:
+**Recommended installer** — works from an installed `plan-auditor` distribution:
 
 ```bash
-git clone https://github.com/Furox-Art/plan-auditor.git
-cp -r plan-auditor/SKILL.md plan-auditor/scripts plan-auditor/references plan-auditor/hooks \
-      <your host's user-level path below>/
+plan-auditor install-skill --host claude --scope user
+plan-auditor install-skill --host codex --scope project --dir .
+plan-auditor install-skill --host opencode --dry-run
 ```
 
-**From a `pip` install** — works from a build of `main` or later. The wheel
-namespaces those assets under `plan_auditor_skill/` so they cannot collide with
-anything else at the site-packages root. Print the directory and copy them out:
+The installer copies `SKILL.md`, `scripts/`, `references/` and `hooks/` into the
+host path. Identical files are left unchanged. A differing existing file is
+copied to a timestamped backup beside the target before replacement, and the JSON
+output lists every source, target, and backup path. Host settings files are not
+modified automatically; when a blocking hook is desired, configure the printed
+`hook_command` using the host-specific syntax below.
 
-```bash
-python -c "import supervisor,pathlib;print(pathlib.Path(supervisor.__file__).resolve().parent.parent/'plan_auditor_skill')"
-```
-
-The published PyPI `2.4.2` wheel contains them; CI asserts that
-every wheel it builds does, via `.github/scripts/check_dist_assets.py`.
+The wheel namespaces static assets under `plan_auditor_skill/` so they cannot
+collide with anything else at the site-packages root. CI asserts that every wheel
+it builds contains them via `.github/scripts/check_dist_assets.py`.
 
 | Tool | User-level path | Project-level path | Typical invocation |
 |---|---|---|---|
 | Command Code | `~/.commandcode/skills/plan-auditor/` | `.commandcode/skills/plan-auditor/` | `/plan-auditor` |
 | Claude Code | `~/.claude/skills/plan-auditor/` | `.claude/skills/plan-auditor/` | `/plan-auditor` |
-| Codex CLI | `~/.codex/skills/plan-auditor/` | `.codex/skills/plan-auditor/` | `$plan-auditor` |
+| Codex CLI | `~/.agents/skills/plan-auditor/` | `.agents/skills/plan-auditor/` | `$plan-auditor` |
 | OpenCode | `~/.config/opencode/skills/plan-auditor/` | `.opencode/skills/plan-auditor/` | `/plan-auditor` |
+
+The Codex and OpenCode rows follow the current
+[Codex customization](https://learn.chatgpt.com/docs/customization/overview) and
+[OpenCode skills](https://opencode.ai/docs/skills/) documentation: Codex uses
+`.agents/skills`, while OpenCode uses `.opencode/skills` for project skills and
+`~/.config/opencode/skills` for user skills.
 
 Start a new host-tool session after installing/changing skills if that host only
 discovers skills at startup.

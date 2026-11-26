@@ -6,6 +6,7 @@ and the published artifacts must be mechanically true, or the suite fails.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from pathlib import Path
@@ -122,7 +123,7 @@ def _subcommands() -> dict[str, set[str] | None]:
         for name, sub in action.choices.items():
             inner: set[str] | None = None
             for sub_action in sub._actions:
-                if getattr(sub_action, "choices", None):
+                if isinstance(sub_action, argparse._SubParsersAction):
                     inner = set(sub_action.choices)
                     break
             top[name] = inner
@@ -372,6 +373,20 @@ def test_documented_cli_invocations_exist() -> None:
     assert not problems, "; ".join(problems)
 
 
+def test_every_public_cli_command_is_documented() -> None:
+    """Coverage is bidirectional: real commands must not be absent from CLI docs."""
+    cli_doc = _read(DOCS / "cli.md")
+    missing: list[str] = []
+    for command, nested in sorted(_subcommands().items()):
+        if not re.search(rf"`plan-auditor {re.escape(command)}(?:\s|`)", cli_doc):
+            missing.append(f"plan-auditor {command}")
+        for action in sorted(nested or ()):
+            invocation = f"plan-auditor {command} {action}"
+            if not re.search(rf"`{re.escape(invocation)}(?:\s|`)", cli_doc):
+                missing.append(invocation)
+    assert not missing, "commands missing from docs/cli.md: " + ", ".join(missing)
+
+
 def test_pyproject_metadata_is_complete_and_consistent() -> None:
     text = _read(PYPROJECT)
     project = _toml_block(text, "project")
@@ -404,7 +419,7 @@ def test_pyproject_metadata_is_complete_and_consistent() -> None:
         assert slug in urls[key]
     assert urls["Changelog"].endswith("/CHANGELOG.md")
     assert urls["Security"].endswith("/SECURITY.md")
-    assert urls["Documentation"].endswith("/tree/main/docs")
+    assert urls["Documentation"] == "https://furox-art.github.io/plan-auditor/"
     assert re.fullmatch(r"\d+\.\d+\.\d+", version)
     assert version == _package_version(), "pyproject and package.json versions must match"
 
@@ -418,6 +433,9 @@ def test_project_urls_resolve_to_repository_paths() -> None:
     # GitHub-managed destinations are not files in the tree.
     managed = {"issues", "releases", "tags", "pulls", "actions", "security", "graphs"}
     for key, url in urls.items():
+        if key == "Documentation":
+            assert url == "https://furox-art.github.io/plan-auditor/"
+            continue
         assert url.startswith("https://github.com/"), f"{key} must be a repository URL: {url}"
         path = url.split("https://github.com/", 1)[1].split("/", 2)
         repo_path = "/".join(path[2:])

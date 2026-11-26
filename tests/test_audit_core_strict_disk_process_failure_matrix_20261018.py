@@ -47,7 +47,7 @@ def test_named_plan_containment_is_checked_again_after_resolving_realpath(monkey
 
 
 def test_missing_and_invalid_named_plan_are_real_explicit_errors(tmp_path):
-    with pytest.raises(SystemExit, match="plan yok"):
+    with pytest.raises(SystemExit, match="plan not found"):
         core.load_plan(str(tmp_path))
     with pytest.raises(SystemExit, match="invalid plan name"):
         core.load_plan(str(tmp_path), "../unsafe")
@@ -58,7 +58,7 @@ def test_oversized_plan_never_allocates_or_parses_large_untrusted_json(tmp_path)
     plan.parent.mkdir()
     with plan.open("wb") as f:
         f.truncate(core.MAX_PLAN_BYTES + 1)
-    with pytest.raises(SystemExit, match="plan cok buyuk"):
+    with pytest.raises(SystemExit, match="plan too large"):
         core.load_plan(str(tmp_path))
 
 

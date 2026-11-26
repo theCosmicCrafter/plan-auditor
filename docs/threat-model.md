@@ -72,6 +72,9 @@ key inaccessible to the untrusted account when that adversary is in scope.
 | File-mode drift | Workspace fingerprint includes type and POSIX mode as well as content/symlink target |
 | Output-memory exhaustion | Verification command output is bounded before it is retained/processed |
 | Internal shell surface | Supervisor workspace/watchdog probes use structured argv with `shell=False` |
+| Undeclared proxied egress | Optional sealed `traffic.allowed_hosts` contract; deterministic loopback capture records host/method/path metadata, payload hashes, masked secret hits, and exact session counts in the authenticated evidence chain |
+| Proxy silence / bypass | `SILENT` is failure rather than proof; only deployment-level network isolation can bound clients that bypass the cooperative proxy |
+| Traffic CA misuse | CA installation is explicit, workspace-local, platform-specific, documented, and removable; private keys use `0600` on POSIX but Windows protection depends on profile ACLs |
 | Packaging/platform drift | Real wheel is installed in a clean venv and exercised on Ubuntu, Windows and macOS |
 
 ## Verification commands are still code
@@ -84,6 +87,22 @@ optional adversarial review that can propose stronger deterministic checks.
 
 The adversarial/LLM layer cannot create PASS. It can only withhold PASS or suggest
 additional deterministic checks.
+
+## Traffic capture boundary
+
+The optional traffic subsystem is a cooperative loopback HTTPS observer, not a
+network sandbox. It records deterministic metadata for clients explicitly
+configured to use the proxy and compares the chained records with the sealed
+`traffic.allowed_hosts` contract. Raw request bodies and sensitive header values
+are not written to evidence; recognized secret shapes are masked and
+fingerprinted. A clean chain with zero observed requests is `SILENT`, not proof,
+because a client can bypass the proxy or fail to inherit its settings. Use
+container/VM/egress isolation when a hostile network actor is in scope.
+
+`--install-ca` changes a real operating-system trust store and requires explicit
+operator consent. `--remove-ca` removes the exact certificate from the documented
+store and deletes workspace-local CA files, but cannot remove copies manually
+imported elsewhere. See [Traffic evidence](traffic.md) for the platform matrix.
 
 ## External-key authenticated integrity
 

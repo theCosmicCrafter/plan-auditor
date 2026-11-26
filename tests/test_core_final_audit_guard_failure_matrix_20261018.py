@@ -32,7 +32,7 @@ def test_invalid_output_dependency_graph_refuses_execution(monkeypatch, tmp_path
 
 def test_unknown_step_selection_is_error_not_silent_success(monkeypatch, tmp_path):
     _minimal(monkeypatch)
-    with pytest.raises(SystemExit, match="planda yok"):
+    with pytest.raises(SystemExit, match=r"step id\(s\) not present in plan"):
         ac.audit_steps(str(tmp_path), _plan(), ids=[999])
 
 

@@ -32,7 +32,7 @@ def test_malformed_runtime_config_is_explicit_failure_not_the_default(
     )
     result = command(args(tmp_path))
     assert result in (1, 2)
-    assert "CONFIG HATASI" in capsys.readouterr().out
+    assert "CONFIG ERROR" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -223,7 +223,7 @@ def test_core_entrypoint_cannot_escape_named_plan_basename(monkeypatch, tmp_path
 
 def test_missing_working_directory_is_an_explicit_exit_not_a_success(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["audit_check", "status", str(tmp_path / "nonexistent")])
-    with pytest.raises(SystemExit, match="dizin yok"):
+    with pytest.raises(SystemExit, match="directory not found"):
         ac.main()
 
 
