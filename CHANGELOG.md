@@ -13,12 +13,20 @@ All notable changes to plan-auditor. Versions are published to PyPI and npm.
   Windows drive/UNC paths no longer slip through on POSIX. The Windows-only
   skip in the ownership-confinement test is removed; the contract is now
   cross-platform, with new tests pinning both dialects.
+- Console output is escaped rather than crashing on legacy terminal encodings,
+  and Linux traffic-CA trust entries are isolated by certificate fingerprint so
+  one workspace cannot remove another workspace's CA.
+- The authenticated quickstart now matches the enforced HMAC workflow and is
+  regenerated from real CLI runs in tests.
 
 ### Docs
 
 - The Python support floor in README, `docs/quickstart.md`, `package.json` and
   CONTRIBUTING now says 3.11, matching `requires-python = ">=3.11"` (3.10 was
   dropped in 2.6.4).
+- Project metadata now points Documentation at the published MkDocs site and
+  records that `theCosmicCrafter/plan-auditor` is the downstream development
+  fork of canonical `Furox-Art/plan-auditor`.
 
 ### CI
 
@@ -29,6 +37,12 @@ All notable changes to plan-auditor. Versions are published to PyPI and npm.
 
 ### Added
 
+- Safe onboarding commands: `plan-auditor init` scaffolds missing plan,
+  request, and supervisor files without activating the request contract;
+  `plan-auditor integrity keygen` creates or reuses a workspace-external HMAC
+  key without printing key material; and `plan-auditor install-skill` copies
+  host skill assets with timestamped backups instead of overwriting local
+  customizations.
 - Mutation-testing configuration (`[tool.mutmut]`) targeting the core modules,
   with a runner that reinstalls the mutated checkout to honour the
   installed-distribution contract, and a contributor guide in CONTRIBUTING.md.
