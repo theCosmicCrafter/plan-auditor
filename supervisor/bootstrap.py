@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -24,11 +25,8 @@ def _timestamp() -> str:
 def python_pytest_template() -> tuple[dict[str, Any], dict[str, Any]]:
     # Use the environment's Python rather than the auditor executable so a
     # pipx-installed auditor can still test a project virtual environment.
-    check = {
-        "type": "exec",
-        "argv": ["python", "-m", "pytest", "tests"],
-        "expect_exit": 0,
-    }
+    python = shutil.which("python") or shutil.which("python3") or sys.executable
+    check = {"type": "exec", "argv": [python, "-m", "pytest"], "expect_exit": 0}
     plan = {
         "task": "Prove the Python test suite passes",
         "created": _timestamp(),
@@ -169,7 +167,8 @@ def init_workspace(
     default_plan = pg / "plan.json"
     named_plan_dir = pg / "plans"
     has_named_plans = named_plan_dir.is_dir() and any(
-        child.suffix.lower() == ".json" for child in named_plan_dir.iterdir()
+        child.is_file() and not child.is_symlink() and child.suffix.lower() == ".json"
+        for child in named_plan_dir.iterdir()
     )
     if not default_plan.exists() and not default_plan.is_symlink() and has_named_plans:
         operations.append({"path": str(named_plan_dir), "action": "existing"})
