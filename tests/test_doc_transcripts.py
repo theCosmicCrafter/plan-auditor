@@ -8,6 +8,7 @@ against output regenerated from a real failing run.
 from __future__ import annotations
 
 import json
+import locale
 import re
 import shutil
 import subprocess
@@ -60,7 +61,7 @@ def _tail(proc: subprocess.CompletedProcess, limit: int = 600) -> str:
 
 
 def _lines(raw: bytes | str) -> list[str]:
-    """Split raw tool output the way a POSIX reader sees it.
+    """Split raw tool output using the host console encoding.
 
     The core joins a captured traceback into a single physical line separated by
     ``" | "``. On Windows the captured child output uses ``\\r\\n``, so the join
@@ -71,7 +72,7 @@ def _lines(raw: bytes | str) -> list[str]:
     matches what the tool prints on POSIX.
     """
     if isinstance(raw, bytes):
-        text = raw.decode("utf-8", errors="replace")
+        text = raw.decode(locale.getpreferredencoding(False), errors="replace")
     else:
         text = raw
     return text.replace("\r\n", "\n").replace("\r", "").split("\n")

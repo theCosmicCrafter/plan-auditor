@@ -126,6 +126,8 @@ def test_readme_quickstart_commands_really_run_and_pass(
         "plan-auditor audit .",
     ], "quick start command list changed; keep it in sync with the transcript"
 
+    monkeypatch.delenv("PLAN_AUDITOR_HMAC_KEY", raising=False)
+    monkeypatch.delenv("PLAN_AUDITOR_HMAC_KEY_FILE", raising=False)
     workspace = _workspace(tmp_path, quickstart)
     observed: list[str] = []
     for command in commands:
@@ -133,6 +135,10 @@ def test_readme_quickstart_commands_really_run_and_pass(
             _install_hmac_key(tmp_path, monkeypatch)
         code = main(_argv(command, workspace))
         observed.append(capfd.readouterr().out)
+        if command == "plan-auditor run . 1":
+            pre_integrity_code = main(["audit", str(workspace)])
+            capfd.readouterr()
+            assert pre_integrity_code != 0, "keyless evidence must fail closed before integrity init"
     captured = _mask("".join(observed))
     assert code == 0, (
         "the documented quick start must end with `plan-auditor audit` exiting 0\n"
@@ -273,6 +279,17 @@ def test_readme_quickstart_json_keys_match_the_real_output(
     assert not problems, "README JSON shape does not match real output:\n  " + "\n  ".join(
         problems
     )
+
+
+def test_docs_quickstart_uses_the_same_command_sequence(quickstart: dict) -> None:
+    document = (ROOT / "docs" / "quickstart.md").read_text(encoding="utf-8")
+    section = document.split("\n## Your first verified task", 1)[1].split("\n## ", 1)[0]
+    commands = [
+        line.strip()
+        for line in section.splitlines()
+        if line.strip().startswith("plan-auditor ")
+    ]
+    assert commands == quickstart["commands"]
 
 
 def test_readme_quickstart_transcript_covers_every_documented_command(

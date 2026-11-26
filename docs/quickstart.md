@@ -1,12 +1,12 @@
 # Quick start
 
-Get a task proven end to end. The commands and the transcript below are checked
-mechanically: `tests/test_readme_quickstart.py` executes the equivalent
-walkthrough from the README, `tests/test_doc_transcripts.py` compares the failing
-run shown here against real output, and
-`tests/test_docs_metadata.py` checks that every `plan-auditor` command on this
-page is a real subcommand. None of them run this page top to bottom, so treat the
-walkthrough as verified in pieces rather than as one executed script.
+Get a task proven end to end. The walkthrough below uses the same command sequence
+as the README quickstart. `tests/test_readme_quickstart.py` executes that sequence
+in a clean temporary workspace, proves that a pre-integrity audit fails closed,
+and proves that the authenticated final audit exits `0`. It also compares the
+documented transcript with real output. `tests/test_doc_transcripts.py` checks the
+failing-run transcript on this page, and `tests/test_docs_metadata.py` checks that
+every `plan-auditor` command on this page is a real subcommand.
 
 ## Install
 
@@ -44,7 +44,8 @@ python scripts/audit_check.py --help
 ## Your first verified task
 
 The walkthrough uses a throwaway directory so nothing else on your machine is
-touched.
+touched. It uses the same command sequence as the README quickstart; CI executes
+that sequence and compares the transcript against real output.
 
 **1. Create the project and the plan.**
 
@@ -53,94 +54,67 @@ mkdir plan-auditor-demo && cd plan-auditor-demo
 mkdir .plan-auditor
 ```
 
-`README.md`:
-
-```markdown
-# Demo project
-```
-
-`.plan-auditor/plan.json`:
+`.plan-auditor/plan.json`, and `request-source.json` beside it — the host-owned
+statement of what you asked for, sealed on activation so the agent cannot restate it:
 
 ```json
 {
-  "task": "Prove that README.md exists in this scratch project",
+  "task": "Prove README.md exists and prints its first line",
   "created": "2026-07-24T00:00:00",
-  "requirements": [
-    {
-      "id": "REQ-001",
-      "description": "README.md must exist in the project root and print its first line.",
-      "priority": "must"
-    }
-  ],
-  "steps": [
-    {
-      "id": 1,
-      "title": "README.md exists and is readable",
-      "covers": ["REQ-001"],
-      "verify": [
-        { "type": "file_exists", "path": "README.md" },
-        {
-          "type": "run",
-          "cmd": "python -c \"print(open('README.md', encoding='utf-8').read().strip())\"",
-          "expect_exit": 0
-        }
-      ],
-      "status": "pending"
-    }
-  ]
+  "requirements": [{ "id": "REQ-001", "description": "README.md must exist in the project root and print its first line.", "priority": "must" }],
+  "steps": [{
+    "id": 1, "title": "README.md exists and is readable", "covers": ["REQ-001"], "status": "pending",
+    "verify": [
+      { "type": "file_exists", "path": "README.md" },
+      { "type": "run", "cmd": "python -c \"print(open('README.md', encoding='utf-8').read().strip())\"", "expect_exit": 0 }
+    ]
+  }]
 }
 ```
-
-Two rules are already visible here and they are not optional:
-
-- `requirements` must exist, and every `must`/`should` requirement must be named
-  in at least one step's `covers`.
-- Every step needs at least one **behavioral** check. `file_exists` and `regex`
-  can supplement, but a step made only of those is rejected with
-  *"at least one BEHAVIORAL control (run/pytest/exec) is required"*.
-  (`exec` is an accepted alias for `run`: both execute an argv list — or a
-  `cmd` string split without a shell — and both reject `"shell": true`.)
-
-**2. Declare what you asked for.**
-
-`request-source.json`:
 
 ```json
 {
   "format_version": 1,
-  "task": "Prove that README.md exists in this scratch project",
-  "requirements": [
-    {
-      "id": "REQ-001",
-      "description": "README.md must exist in the project root and print its first line.",
-      "priority": "must",
-      "acceptance_checks": [
-        { "type": "file_exists", "path": "README.md" },
-        {
-          "type": "run",
-          "cmd": "python -c \"print(open('README.md', encoding='utf-8').read().strip())\"",
-          "expect_exit": 0
-        }
-      ]
-    }
-  ]
+  "task": "Prove README.md exists and prints its first line",
+  "requirements": [{
+    "id": "REQ-001", "description": "README.md must exist in the project root and print its first line.", "priority": "must",
+    "acceptance_checks": [
+      { "type": "file_exists", "path": "README.md" },
+      { "type": "run", "cmd": "python -c \"print(open('README.md', encoding='utf-8').read().strip())\"", "expect_exit": 0 }
+    ]
+  }]
 }
 ```
 
-This is the host-owned half of the contract. You write it; the agent does not.
-Once activated it is immutable, and the supervisor rejects a plan whose
-requirements no longer match it.
-
-**3. Activate, seal, prove, gate.**
+**2. Run the gate.**
 
 ```bash
 plan-auditor request init . --file request-source.json
 plan-auditor plan verify .
 plan-auditor run . 1
+
+# Before claiming completion, authenticate the evidence chain. A keyless chain
+# is only tamper-evident — anyone with write access can rebuild it — so the
+# gate never treats it as proof. Generate the key OUTSIDE the workspace and
+# point the environment at it:
+python -c "import os, pathlib; d = pathlib.Path.home()/'.plan-auditor'; d.mkdir(exist_ok=True); (d/'plan-auditor-hmac.key').write_bytes(b'plan-auditor: ' + os.urandom(48))"
+export PLAN_AUDITOR_HMAC_KEY_FILE="$HOME/.plan-auditor/plan-auditor-hmac.key"
+plan-auditor integrity init .
 plan-auditor audit .
 ```
 
-Real output:
+On Windows PowerShell, use the same Python key-generation command, then set the
+environment variable with:
+
+```powershell
+$env:PLAN_AUDITOR_HMAC_KEY_FILE = "$HOME\.plan-auditor\plan-auditor-hmac.key"
+```
+
+Use either the Bash `export` or the PowerShell assignment, not both. In both cases
+the key file is outside the workspace; do not commit or copy it into the project.
+
+Real output. A lone `...` marks fields omitted for length; every other line is verbatim,
+and every JSON level that is not elided lists exactly the keys the tool emits.
 
 ```console
 $ plan-auditor request init . --file request-source.json
@@ -148,24 +122,13 @@ $ plan-auditor request init . --file request-source.json
   "activated": true,
   "valid": true,
   "reason": "request contract active",
-  "request_sha256": "d7d47e409fc1c53b9830346740bac2a20e716aefc71e7396ad3db0ebbdd837f2",
+  "request_sha256": "d39e577eb0577d8c0c81231fdd7fc559d1c6045ecc5e5bd3a00e7e8f2f49197b",
   "authenticated": false
 }
 $ plan-auditor plan verify .
 {
   "plans": {
-    "default": {
-      "verdict": "PASS",
-      "schema_errors": [],
-      ...
-      "seal": {
-        "status": "sealed",
-        "format_version": 4,
-        "criteria_count": 2,
-        "plan_hash": "27617f6233effbc0f15c77eed6951a5d656d606f48adee840fd04cf43deb02fa",
-        ...
-      }
-    }
+    ...
   },
   "outcome": "PASS"
 }
@@ -173,18 +136,12 @@ $ plan-auditor run . 1
 [OK ] step 1: README.md exists and is readable (attempt 1/3)
        - passed | README.md EXISTS
        - passed | exit=0 (expected 0)
+$ plan-auditor integrity init .
+{
+  "authenticated": true,
+  ...
+}
 $ plan-auditor audit .
-FULL AUDIT: all steps are being retested in fresh subprocesses...
-
-[OK ] step 1: README.md exists and is readable
-       - passed | README.md EXISTS
-       - passed | exit=0 (expected 0)
-
-ID   ADIM                                       DURUM     KONTROL
-----------------------------------------------------------------------
-1    README.md exists and is readable           VERIFIED  2 kontrol
-
-RESULT: audit PASSED — every step is proven.
 {
   "outcome": "PASS",
   "plans": {
@@ -193,23 +150,19 @@ RESULT: audit PASSED — every step is proven.
   "deterministic_core": "fresh audit PASS for every active plan under workspace-wide freeze",
   "gate": {
     "outcome": "PASS",
-    "deterministic_passed": true,
-    "pending_steps": [],
-    "seal_ok": true,
-    "seal_violations": [],
-    "adversarial_findings": [],
-    "notes": []
+    ...
   }
 }
 ```
 
-A lone `...` marks fields omitted here for length. The progress lines above come
-from the tool's own UI strings; the JSON verdict is the stable machine interface,
-so scripts should read `"outcome"`, not scrape the prose.
+Scoped omission: the elided fields are the plan-inspection block and `seal`, the per-step
+progress lines and verdict table, and the gate's remaining fields including
+`policy_findings`, `verdict` and `seal_ok`. [docs/cli.md](https://github.com/Furox-Art/plan-auditor/blob/main/docs/cli.md)
+shows each command's full output.
 
-Afterwards, `.plan-auditor/` holds `request.json`, `activation.json`, `seal.json`,
-`evidence.jsonl` and the updated `plan.json`. Nothing else needs to be trusted,
-because `plan-auditor audit .` re-derives the verdict from scratch.
+`audit` re-runs every check in a fresh subprocess, and only exit code `0` means the work is
+proven. Progress lines are English human-readable output; the JSON verdict
+is the stable machine interface, so parse `"outcome"`.
 
 ## What "verified" actually means
 
@@ -235,7 +188,8 @@ For a repository you already have:
 3. Activate the contract **yourself**, before handing the task to the agent.
 4. Seal with `plan-auditor plan verify .`.
 5. Let the agent implement and run `plan-auditor run . <step-id>` after each step.
-6. Require `plan-auditor audit .` to exit `0` before merge.
+6. Configure the workspace-external HMAC key, run `plan-auditor integrity init .`,
+   and only then require `plan-auditor audit .` to exit `0` before merge.
 
 Useful conventions:
 

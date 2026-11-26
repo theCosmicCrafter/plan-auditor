@@ -129,6 +129,16 @@ plan-auditor integrity init .
 plan-auditor audit .
 ```
 
+On Windows PowerShell, use the same Python key-generation command, then set the
+environment variable with:
+
+```powershell
+$env:PLAN_AUDITOR_HMAC_KEY_FILE = "$HOME\.plan-auditor\plan-auditor-hmac.key"
+```
+
+Use either the Bash `export` or the PowerShell assignment, not both. In both cases
+the key file is outside the workspace; do not commit or copy it into the project.
+
 Real output. A lone `...` marks fields omitted for length; every other line is verbatim,
 and every JSON level that is not elided lists exactly the keys the tool emits.
 
