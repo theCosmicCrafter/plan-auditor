@@ -7,7 +7,7 @@ on this site is not in the parser surface.
 ```console
 $ plan-auditor --help
 usage: plan-auditor [-h]
-                    {supervisor,task,plan,evidence,integrity,request,agents,audit,traffic,doctor,run,validate}
+                    {supervisor,task,plan,evidence,integrity,request,agents,audit,traffic,doctor,init,install-skill,run,validate}
                     ...
 
 Plan Auditor - independent AI agent verification supervisor.
@@ -41,6 +41,8 @@ python scripts/audit_check.py audit .
 
 | Command | Purpose | Typical exit codes |
 |---|---|---|
+| `plan-auditor init [dir]` | Safely bootstrap plan/request/config templates without activating them | `0` scaffolded, `2` refused |
+| `plan-auditor install-skill --host <host>` | Install host skill assets with backups and optional dry run | `0` installed/planned, `2` refused |
 | `plan-auditor request init --file <f> [dir]` | Activate the host-owned request contract | `0` ok, `1` rejected |
 | `plan-auditor request status [dir]` | Verify activation and plan alignment | `0` aligned, `1` not |
 | `plan-auditor validate [dir]` | Validate plan schema (deterministic core) | `0` valid, `1` invalid |
@@ -52,6 +54,7 @@ python scripts/audit_check.py audit .
 | `plan-auditor traffic [dir] --start/--stop/--status/--report/--verify` | Loopback HTTPS traffic evidence for a plan that opts in | `0` ok, `1` violation/failure, `2` incomplete/tampered/unverified |
 | `plan-auditor traffic [dir] --install-ca/--remove-ca` | Install or remove the workspace-local traffic CA trust material | `0` completed, `2` refused/error |
 | `plan-auditor evidence verify [dir]` | Re-verify the active and archived evidence chains | `0` valid, `1` broken |
+| `plan-auditor integrity keygen [dir] [--out <path>]` | Create or reuse a workspace-external HMAC key without printing key bytes | `0` created/reused, `2` refused |
 | `plan-auditor integrity init [dir]` | Create the external HMAC integrity material | `0` created, `1` refused |
 | `plan-auditor integrity status [dir]` | Report integrity configuration | `0` ok |
 | `plan-auditor task list [dir]` | List plans as supervisor tasks | `0` ok |
@@ -92,9 +95,33 @@ plan-auditor audit .
 With external-key HMAC integrity:
 
 ```bash
+plan-auditor integrity keygen .
+export PLAN_AUDITOR_HMAC_KEY_FILE="$HOME/.plan-auditor/plan-auditor-hmac.key"
 plan-auditor integrity init .
 plan-auditor audit .
 ```
+
+`integrity keygen` creates the default key at `~/.plan-auditor/plan-auditor-hmac.key` unless `--out` selects another path outside the workspace. It refuses to overwrite an existing key, uses mode `0600` on POSIX, reports shell-specific environment instructions, and never prints key bytes.
+
+## Bootstrap and host installation
+
+`plan-auditor init` scaffolds a non-destructive starting point:
+
+```bash
+plan-auditor init . --template python-pytest --create-key --json
+plan-auditor init . --dry-run
+```
+
+It creates only missing files: `.plan-auditor/plan.json`, `request-source.json`, and `.plan-auditor/supervisor.json`. Existing files are left untouched. `request-source.json` is a template, not an approved request; activation still requires an explicit `plan-auditor request init` after the operator edits it. `--dry-run` writes nothing, including key material. `--install-hooks` copies host skill assets only after explicit opt-in; host settings files are not modified automatically.
+
+`plan-auditor install-skill` can also be used directly:
+
+```bash
+plan-auditor install-skill --host claude --scope user
+plan-auditor install-skill --host codex --scope project --dir . --dry-run
+```
+
+Supported hosts are `claude`, `codex`, `opencode`, and `commandcode`. The command copies `SKILL.md`, `hooks/`, `references/`, and the runtime `scripts/` modules into the documented host skill directory. Identical files are left unchanged; differing files are backed up beside the target before replacement. The JSON output lists every source, target, and backup path plus the hook command to configure manually in hosts whose settings format is not known.
 
 ## Traffic evidence
 

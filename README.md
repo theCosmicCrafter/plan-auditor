@@ -61,6 +61,9 @@ launcher for the same CLI and needs Python on `PATH`. The examples call the inte
 `python`; on a system that only ships `python3`, use a virtualenv that provides `python`.
 In CI, add `- uses: Furox-Art/plan-auditor@main` with `path: .` — see
 [integrations](https://github.com/Furox-Art/plan-auditor/blob/main/docs/integrations.md).
+For a real project, `plan-auditor init . --template python-pytest --create-key`
+scaffolds missing files without activating the request contract; the verified
+walkthrough below shows those files explicitly.
 
 **Release status:** `2.6.5` is the current release on both PyPI and npm. PyPI artifacts
 are attested under PEP 740 and npm tarballs are attested with Sigstore SLSA provenance
@@ -124,7 +127,7 @@ plan-auditor run . 1
 # Before claiming completion, authenticate the evidence chain. A keyless chain
 # is only tamper-evident — anyone with write access can rebuild it — so the
 # gate never treats it as proof. Generate the key OUTSIDE the workspace:
-python -c "import os, pathlib; p = pathlib.Path.home()/'.plan-auditor'/'plan-auditor-hmac.key'; p.parent.mkdir(exist_ok=True); fd = os.open(p, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600); os.write(fd, b'plan-auditor: ' + os.urandom(48)); os.close(fd)"
+plan-auditor integrity keygen .
 ```
 
 For Bash, configure the environment and finish the gate with:
@@ -145,8 +148,8 @@ plan-auditor audit .
 
 Use either the Bash `export` or the PowerShell assignment, not both. The setup
 commands avoid `&&`, and the README creation uses exclusive mode (`x`) so an
-existing file is not overwritten. The key-generation command uses `O_EXCL`: it
-refuses to overwrite an existing key. Reuse an existing key; replacing it
+existing file is not overwritten. `integrity keygen` refuses to overwrite an
+existing key. Reuse an existing key; replacing it
 invalidates authentication for workspaces signed with the old key unless you
 deliberately re-authenticate them. In both cases the key file is outside the
 workspace; do not commit or copy it into the project. On POSIX the key is
@@ -176,6 +179,8 @@ $ plan-auditor run . 1
 [OK ] step 1: README.md exists and is readable (attempt 1/3)
        - passed | README.md EXISTS
        - passed | exit=0 (expected 0)
+$ plan-auditor integrity keygen .
+...
 $ plan-auditor integrity init .
 {
   "authenticated": true,
@@ -227,10 +232,11 @@ Per-layer detail, profiles (`light`/`standard`/`strict`), run modes
 
 ## Use it as an Agent Skill
 
-The skill is `SKILL.md` plus `scripts/`, `references/` and `hooks/`, from a checkout
-or a `pip` install (pip keeps `scripts/` top-level, the rest under `plan_auditor_skill/`).
-Copy them into your host's skills directory — `~/.claude/`, `~/.commandcode/`,
-`~/.config/opencode/` or `~/.codex/`, each with a `skills/plan-auditor/` subdirectory.
+The skill is `SKILL.md` plus `scripts/`, `references/` and `hooks/`. Install it
+from the Python distribution with `plan-auditor install-skill --host claude --scope user`
+(or `codex`, `opencode`, or `commandcode`; use `--scope project --dir .` for a project).
+The installer is non-destructive: identical files are reused and modified files are
+backed up before replacement. Host settings are not changed silently.
 `hooks/gate_hook.py` is the primary hook gate; `scripts/stop_gate.py` (Claude Code) delegates
 to the same `evaluate_workspace`. Wire each host's blocking hook to one.
 Per-host paths and CI wiring:
@@ -251,8 +257,9 @@ Reading order starts at [docs/index.md](https://github.com/Furox-Art/plan-audito
 | Published versions, defects, attestations; what is measurable | [release status](https://github.com/Furox-Art/plan-auditor/blob/main/docs/release-status.md) · [benchmark](https://github.com/Furox-Art/plan-auditor/blob/main/docs/benchmark.md) |
 | Plan schema and check types | [plan-format.md](https://github.com/Furox-Art/plan-auditor/blob/main/references/plan-format.md) |
 
-Entry points: the `plan-auditor` CLI (`request`, `plan`, `evidence`, `integrity`,
-`supervisor`, `task`, `agents`, `run`, `validate`, `audit`, `doctor`); the core
+Entry points: the `plan-auditor` CLI (`init`, `install-skill`, `request`, `plan`,
+`evidence`, `integrity`, `supervisor`, `task`, `agents`, `run`, `validate`, `audit`,
+`traffic`, `doctor`); the core
 `python scripts/audit_check.py` (`validate`, `run`, `audit`, `status`, `snapshot`,
 `rollback`); and `plan-auditor-formalize`, `plan-auditor-formal` (`verify`,
 `export-pddl`, `make-check`) and `plan-auditor-migrate-seal`.

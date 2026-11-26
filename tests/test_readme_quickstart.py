@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from supervisor import keygen
 from supervisor.cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,12 +107,19 @@ def _install_hmac_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     file form is the only configuration in effect.
     """
     key_file = tmp_path / "quickstart-hmac.key"
-    # Fixed printable key: load_key strips whitespace, so any leading or
-    # trailing whitespace byte from os.urandom could drop it below the 32
-    # bytes the loader requires and the failure would look nondeterministic.
-    key_file.write_bytes(b"plan-auditor-quickstart-test-key-material-0123456789abcdef")
     monkeypatch.delenv("PLAN_AUDITOR_HMAC_KEY", raising=False)
     monkeypatch.setenv("PLAN_AUDITOR_HMAC_KEY_FILE", str(key_file))
+
+
+def _run_quickstart_command(
+    command: str, workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> int:
+    if command.startswith("plan-auditor integrity keygen"):
+        key_file = tmp_path / "quickstart-hmac.key"
+        monkeypatch.setattr(keygen, "default_key_path", lambda: key_file)
+    if command.startswith("plan-auditor integrity init"):
+        _install_hmac_key(tmp_path, monkeypatch)
+    return main(_argv(command, workspace))
 
 
 def test_readme_quickstart_commands_really_run_and_pass(
@@ -122,6 +130,7 @@ def test_readme_quickstart_commands_really_run_and_pass(
         "plan-auditor request init . --file request-source.json",
         "plan-auditor plan verify .",
         "plan-auditor run . 1",
+        "plan-auditor integrity keygen .",
         "plan-auditor integrity init .",
         "plan-auditor audit .",
     ], "quick start command list changed; keep it in sync with the transcript"
@@ -131,9 +140,7 @@ def test_readme_quickstart_commands_really_run_and_pass(
     workspace = _workspace(tmp_path, quickstart)
     observed: list[str] = []
     for command in commands:
-        if command.startswith("plan-auditor integrity init"):
-            _install_hmac_key(tmp_path, monkeypatch)
-        code = main(_argv(command, workspace))
+        code = _run_quickstart_command(command, workspace, tmp_path, monkeypatch)
         observed.append(capfd.readouterr().out)
         if command == "plan-auditor run . 1":
             pre_integrity_code = main(["audit", str(workspace)])
@@ -216,9 +223,7 @@ def test_readme_quickstart_hashes_are_not_normalised_away(
     workspace = _workspace(tmp_path, quickstart)
     observed: list[str] = []
     for command in quickstart["commands"]:
-        if command.startswith("plan-auditor integrity init"):
-            _install_hmac_key(tmp_path, monkeypatch)
-        main(_argv(command, workspace))
+        _run_quickstart_command(command, workspace, tmp_path, monkeypatch)
         observed.append(capfd.readouterr().out)
     verbatim = "".join(observed).replace("\r\n", "\n")
 
@@ -247,9 +252,7 @@ def test_readme_quickstart_json_keys_match_the_real_output(
     workspace = _workspace(tmp_path, quickstart)
     observed: list[str] = []
     for command in quickstart["commands"]:
-        if command.startswith("plan-auditor integrity init"):
-            _install_hmac_key(tmp_path, monkeypatch)
-        main(_argv(command, workspace))
+        _run_quickstart_command(command, workspace, tmp_path, monkeypatch)
         observed.append(capfd.readouterr().out)
 
     documented_chunks = _chunks_by_command("\n".join(quickstart["transcript"]))

@@ -43,6 +43,11 @@ python scripts/audit_check.py --help
 
 ## Your first verified task
 
+For a real project, `plan-auditor init . --template python-pytest --create-key`
+can scaffold missing plan, request, supervisor configuration, and external key
+material without activating the request contract. The walkthrough below creates
+the tiny demo files explicitly so every byte of the verified example is visible.
+
 The walkthrough uses a throwaway directory so nothing else on your machine is
 touched. It uses the same command sequence as the README quickstart; CI executes
 that sequence and compares the transcript against real output.
@@ -98,7 +103,7 @@ plan-auditor run . 1
 # Before claiming completion, authenticate the evidence chain. A keyless chain
 # is only tamper-evident — anyone with write access can rebuild it — so the
 # gate never treats it as proof. Generate the key OUTSIDE the workspace:
-python -c "import os, pathlib; p = pathlib.Path.home()/'.plan-auditor'/'plan-auditor-hmac.key'; p.parent.mkdir(exist_ok=True); fd = os.open(p, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600); os.write(fd, b'plan-auditor: ' + os.urandom(48)); os.close(fd)"
+plan-auditor integrity keygen .
 ```
 
 For Bash, configure the environment and finish the gate with:
@@ -119,8 +124,8 @@ plan-auditor audit .
 
 Use either the Bash `export` or the PowerShell assignment, not both. The setup
 commands avoid `&&`, and the README creation uses exclusive mode (`x`) so an
-existing file is not overwritten. The key-generation command uses `O_EXCL`: it
-refuses to overwrite an existing key. Reuse an existing key; replacing it
+existing file is not overwritten. `integrity keygen` refuses to overwrite an
+existing key. Reuse an existing key; replacing it
 invalidates authentication for workspaces signed with the old key unless you
 deliberately re-authenticate them. In both cases the key file is outside the
 workspace; do not commit or copy it into the project. On POSIX the key is
@@ -150,6 +155,8 @@ $ plan-auditor run . 1
 [OK ] step 1: README.md exists and is readable (attempt 1/3)
        - passed | README.md EXISTS
        - passed | exit=0 (expected 0)
+$ plan-auditor integrity keygen .
+...
 $ plan-auditor integrity init .
 {
   "authenticated": true,

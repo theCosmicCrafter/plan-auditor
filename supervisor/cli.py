@@ -64,6 +64,10 @@ def _build_parser() -> argparse.ArgumentParser:
     integrity_init.add_argument("dir", nargs="?", default=".")
     integrity_status = integrity_sub.add_parser("status", help="show authenticated integrity status")
     integrity_status.add_argument("dir", nargs="?", default=".")
+    integrity_keygen = integrity_sub.add_parser("keygen", help="create a workspace-external HMAC key")
+    integrity_keygen.add_argument("dir", nargs="?", default=".")
+    integrity_keygen.add_argument("--out", help="key output path; default is outside the workspace in the user profile")
+    integrity_keygen.add_argument("--strict", action="store_true", help="refuse group/other-readable existing keys on POSIX")
 
     request = sub.add_parser("request", help="host-owned immutable request contract")
     request_sub = request.add_subparsers(dest="action", required=True)
@@ -108,6 +112,27 @@ def _build_parser() -> argparse.ArgumentParser:
     traffic.add_argument("--timeout", type=float, default=30.0)
     doctor = sub.add_parser("doctor", help="environment and supervisor capability report")
     doctor.add_argument("dir", nargs="?", default=".")
+
+    init_cmd = sub.add_parser("init", help="safely bootstrap a workspace")
+    init_cmd.add_argument("dir", nargs="?", default=".")
+    init_cmd.add_argument("--host", default="auto", choices=["auto", "none", "claude", "codex", "opencode", "commandcode"])
+    init_cmd.add_argument("--profile", choices=["light", "standard", "strict"], default="standard")
+    init_cmd.add_argument("--mode", choices=["serial", "parallel-warn", "parallel-strict"], default="serial")
+    init_cmd.add_argument("--template", choices=["python-pytest", "generic"], default="python-pytest")
+    init_cmd.add_argument("--create-key", action="store_true")
+    init_cmd.add_argument("--key-out", help="external HMAC key path used with --create-key")
+    hooks_group = init_cmd.add_mutually_exclusive_group()
+    hooks_group.add_argument("--install-hooks", action="store_true")
+    hooks_group.add_argument("--no-install-hooks", action="store_true")
+    init_cmd.add_argument("--hook-scope", choices=["user", "project"], default="user")
+    init_cmd.add_argument("--dry-run", action="store_true")
+    init_cmd.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+
+    install_skill_cmd = sub.add_parser("install-skill", help="install host skill assets")
+    install_skill_cmd.add_argument("--host", required=True, choices=["claude", "codex", "opencode", "commandcode"])
+    install_skill_cmd.add_argument("--scope", choices=["user", "project"], default="user")
+    install_skill_cmd.add_argument("--dir", default=".", help="project directory for project-scope installation")
+    install_skill_cmd.add_argument("--dry-run", action="store_true")
 
     for name in ("run", "validate"):
         item = sub.add_parser(name, help=f"forward to deterministic core: {name}")
@@ -251,6 +276,54 @@ def cmd_supervisor_status(args: argparse.Namespace) -> int:
         state["state"] = "stale"
     _json(state)
     return 0 if running else 1
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    from .bootstrap import BootstrapError, init_workspace
+    try:
+        result = init_workspace(
+            args.dir,
+            host=args.host,
+            profile=args.profile,
+            mode=args.mode,
+            template=args.template,
+            create_key=args.create_key,
+            key_out=args.key_out,
+            install_hooks=args.install_hooks and not args.no_install_hooks,
+            hook_scope=args.hook_scope,
+            dry_run=args.dry_run,
+        )
+    except (BootstrapError, OSError, ValueError) as exc:
+        _json({"initialized": False, "error": str(exc)})
+        return ExitCode.REQUEST_REFUSED
+    if args.json:
+        _json(result)
+    else:
+        print(f"Plan Auditor bootstrap: {result['workspace']}")
+        for item in result["operations"]:
+            print(f"{item['action']}: {item['path']}")
+        if result["key"]:
+            print(f"HMAC key: {result['key']['path']} (created={result['key']['created']})")
+            print("Bash: " + result["key"]["environment"]["bash"])
+            print("PowerShell: " + result["key"]["environment"]["powershell"])
+        if result["hook_warning"]:
+            print("WARNING: " + result["hook_warning"])
+        if result["hooks"]:
+            print(f"Skill assets: {result['hooks']['target']} (settings_modified=False)")
+            print("Hook command: " + result["hooks"]["hook_command"])
+        print("Request contract not activated; edit request-source.json, then activate it explicitly.")
+    return ExitCode.VERIFICATION_PASSED
+
+
+def cmd_install_skill(args: argparse.Namespace) -> int:
+    from .host_install import InstallSkillError, install_skill
+    try:
+        result = install_skill(args.host, scope=args.scope, directory=args.dir, dry_run=args.dry_run)
+    except (InstallSkillError, OSError, ValueError) as exc:
+        _json({"installed": False, "error": str(exc)})
+        return ExitCode.REQUEST_REFUSED
+    _json(result)
+    return ExitCode.VERIFICATION_PASSED
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -537,6 +610,15 @@ def cmd_integrity(args: argparse.Namespace) -> int:
     from .integrity import initialize_integrity, integrity_status
     from .sealing import SealIntegrityError
     root = _root(args.dir)
+    if args.action == "keygen":
+        from .keygen import KeygenError, generate_key_file
+        try:
+            result = generate_key_file(args.out, workspace=root, strict=args.strict)
+        except (KeygenError, OSError, ValueError) as exc:
+            _json({"created": False, "error": str(exc)})
+            return ExitCode.REQUEST_REFUSED
+        _json(result)
+        return ExitCode.VERIFICATION_PASSED
     if args.action == "status":
         result = integrity_status(root)
         _json(result)
@@ -818,6 +900,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_audit(args)
     if args.cmd == "traffic":
         return cmd_traffic(args)
+    if args.cmd == "init":
+        return cmd_init(args)
+    if args.cmd == "install-skill":
+        return cmd_install_skill(args)
     if args.cmd == "doctor":
         return cmd_doctor(args)
     return ExitCode.VERIFICATION_FAILED

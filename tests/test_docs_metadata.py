@@ -6,6 +6,7 @@ and the published artifacts must be mechanically true, or the suite fails.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from pathlib import Path
@@ -122,7 +123,7 @@ def _subcommands() -> dict[str, set[str] | None]:
         for name, sub in action.choices.items():
             inner: set[str] | None = None
             for sub_action in sub._actions:
-                if getattr(sub_action, "choices", None):
+                if isinstance(sub_action, argparse._SubParsersAction):
                     inner = set(sub_action.choices)
                     break
             top[name] = inner
