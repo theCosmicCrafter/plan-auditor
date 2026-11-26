@@ -306,6 +306,7 @@ def test_shell_specific_key_configuration_precedes_integrity_init() -> None:
         assert block.index("$env:PLAN_AUDITOR_HMAC_KEY_FILE") < block.index(
             "plan-auditor integrity init"
         )
+        assert block.index("plan-auditor integrity init") < block.index("plan-auditor audit .")
         assert "export PLAN_AUDITOR_HMAC_KEY_FILE" not in block
 
 
