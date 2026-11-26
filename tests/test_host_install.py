@@ -79,7 +79,8 @@ def test_install_skill_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert all(item["action"].startswith("planned-") for item in result["operations"])
     assert not (project / ".claude").exists()
     assert result["hook_commands"]["posix"] == shlex.join(result["hook_commands"]["argv"])
-    assert result["hook_command"] == result["hook_commands"]["cmd" if os.name == "nt" else "posix"]
+    expected_key = "cmd" if os.name == "nt" else "posix"
+    assert result["hook_command"] == result["hook_commands"][expected_key]
     assert "gate_hook.py" in result["hook_command"]
     assert result["settings_modified"] is False
 
@@ -241,3 +242,17 @@ def test_reject_symlinked_install_path_refuses_boundary_symlink(tmp_path: Path) 
         pytest.skip("symlink creation unavailable")
     with pytest.raises(InstallSkillError, match="refusing to follow installation symlink"):
         host_install._reject_symlinked_install_path(boundary, boundary / "SKILL.md")
+
+
+def test_hook_commands_use_powershell_call_operator_and_quote_cmd_metacharacters(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project&hooks"
+    project.mkdir()
+    result = install_skill("claude", scope="project", directory=project, dry_run=True)
+    commands = result["hook_commands"]
+    assert commands["powershell"].startswith("& '")
+    assert "&" in str(result["target"])
+    quoted_target = host_install._cmd_quote(str(Path(result["target"]) / "hooks" / "gate_hook.py"))
+    assert quoted_target.startswith('"') and quoted_target.endswith('"')
+    assert quoted_target in commands["cmd"]

@@ -134,6 +134,15 @@ def _install_file(source: Path, target: Path, *, boundary: Path, dry_run: bool) 
     return operation
 
 
+def _cmd_quote(value: str) -> str:
+    quoted = subprocess.list2cmdline([value])
+    if any(char in value for char in "&|%<>^") and not (
+        quoted.startswith('"') and quoted.endswith('"')
+    ):
+        return '"' + value.replace('"', '\\"') + '"'
+    return quoted
+
+
 def install_skill(
     host: str,
     *,
@@ -152,6 +161,8 @@ def install_skill(
     assets = _iter_asset_files(root)
     if not assets:
         raise InstallSkillError(f"no skill assets found under {root}")
+    for _source, relative in assets:
+        _reject_symlinked_install_path(base, target / relative)
     operations = [
         _install_file(source, target / relative, boundary=base, dry_run=dry_run)
         for source, relative in assets
@@ -164,8 +175,8 @@ def install_skill(
     hook_commands = {
         "argv": hook_argv,
         "posix": shlex.join(hook_argv),
-        "powershell": " ".join("'" + item.replace("'", "''") + "'" for item in hook_argv),
-        "cmd": subprocess.list2cmdline(hook_argv),
+        "powershell": "& " + " ".join("'" + item.replace("'", "''") + "'" for item in hook_argv),
+        "cmd": " ".join(_cmd_quote(item) for item in hook_argv),
     }
     return {
         "host": host,
