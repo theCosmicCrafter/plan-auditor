@@ -178,3 +178,61 @@ def test_init_cli_human_reports_key_hooks_and_warnings(tmp_path: Path, capfd) ->
     assert main(["init", str(other), "--host", "none", "--install-hooks"]) == 0
     warning = capfd.readouterr().out
     assert "WARNING: no supported host directory detected" in warning
+
+
+def test_python_template_can_activate_and_seal(tmp_path: Path, capfd) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    assert main(["init", str(workspace), "--host", "none", "--json"]) == 0
+    capfd.readouterr()
+    assert (
+        main(["request", "init", str(workspace), "--file", str(workspace / "request-source.json")])
+        == 0
+    )
+    capfd.readouterr()
+    assert main(["plan", "verify", str(workspace)]) == 0
+    capfd.readouterr()
+    plan = json.loads((workspace / ".plan-auditor" / "plan.json").read_text(encoding="utf-8"))
+    assert plan["steps"][0]["verify"][0]["argv"] == ["python", "-m", "pytest", "tests"]
+
+
+def test_init_workspace_does_not_add_default_plan_beside_named_plans(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    named = workspace / ".plan-auditor" / "plans"
+    named.mkdir(parents=True)
+    (named / "release.json").write_text("{}\n", encoding="utf-8")
+    result = init_workspace(workspace, host="none")
+    assert result["request_activated"] is False
+    assert not (workspace / ".plan-auditor" / "plan.json").exists()
+
+
+def test_init_workspace_refuses_symlinked_scaffold_state(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    try:
+        (workspace / ".plan-auditor").symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation unavailable")
+    with pytest.raises(BootstrapError, match="refusing to follow scaffold symlink"):
+        init_workspace(workspace, host="none")
+
+
+def test_init_workspace_refuses_dangling_destination_symlink(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    try:
+        (workspace / "request-source.json").symlink_to(tmp_path / "outside.json")
+    except OSError:
+        pytest.skip("symlink creation unavailable")
+    with pytest.raises(BootstrapError, match="refusing to follow scaffold symlink"):
+        init_workspace(workspace, host="none")
+
+
+def test_init_workspace_refuses_non_directory_scaffold_state(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".plan-auditor").write_text("not a directory", encoding="utf-8")
+    with pytest.raises(BootstrapError, match="not a directory"):
+        init_workspace(workspace, host="none")

@@ -22,7 +22,13 @@ def _timestamp() -> str:
 
 
 def python_pytest_template() -> tuple[dict[str, Any], dict[str, Any]]:
-    check = {"type": "pytest", "args": "", "expect_exit": 0}
+    # Use the environment's Python rather than the auditor executable so a
+    # pipx-installed auditor can still test a project virtual environment.
+    check = {
+        "type": "exec",
+        "argv": ["python", "-m", "pytest", "tests"],
+        "expect_exit": 0,
+    }
     plan = {
         "task": "Prove the Python test suite passes",
         "created": _timestamp(),
@@ -110,6 +116,8 @@ def template_documents(name: str) -> tuple[dict[str, Any], dict[str, Any]]:
 def _write_json_once(
     path: Path, payload: dict[str, Any], *, dry_run: bool, operations: list[dict[str, Any]]
 ) -> None:
+    if path.is_symlink():
+        raise BootstrapError(f"refusing to follow scaffold symlink: {path}")
     if path.exists():
         operations.append({"path": str(path), "action": "existing"})
         return
@@ -145,6 +153,10 @@ def init_workspace(
 
     operations: list[dict[str, Any]] = []
     pg = root / ".plan-auditor"
+    if pg.is_symlink():
+        raise BootstrapError(f"refusing to follow scaffold symlink: {pg}")
+    if pg.exists() and not pg.is_dir():
+        raise BootstrapError(f"scaffold state path is not a directory: {pg}")
     if pg.exists():
         operations.append({"path": str(pg), "action": "existing"})
     elif dry_run:
@@ -154,7 +166,15 @@ def init_workspace(
         operations.append({"path": str(pg), "action": "created"})
 
     plan, request = template_documents(template)
-    _write_json_once(pg / "plan.json", plan, dry_run=dry_run, operations=operations)
+    default_plan = pg / "plan.json"
+    named_plan_dir = pg / "plans"
+    has_named_plans = named_plan_dir.is_dir() and any(
+        child.suffix.lower() == ".json" for child in named_plan_dir.iterdir()
+    )
+    if not default_plan.exists() and not default_plan.is_symlink() and has_named_plans:
+        operations.append({"path": str(named_plan_dir), "action": "existing"})
+    else:
+        _write_json_once(default_plan, plan, dry_run=dry_run, operations=operations)
     _write_json_once(root / "request-source.json", request, dry_run=dry_run, operations=operations)
     config = {"profile": profile, "mode": mode, "tier": 1}
     _write_json_once(pg / CONFIG_FILENAME, config, dry_run=dry_run, operations=operations)
