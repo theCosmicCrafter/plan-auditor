@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import audit_check as ac
+from scripts import console as console_output
 from scripts.integrity import KeyMaterial
 
 
@@ -139,7 +140,7 @@ def test_authenticated_rotation_rewrites_head_checkpoint(monkeypatch, tmp_path):
 
 
 def test_main_handles_streams_without_reconfigure(monkeypatch, tmp_path):
-    monkeypatch.setattr(ac, "sys", SimpleNamespace(stdout=object(), stderr=object()))
+    monkeypatch.setattr(console_output, "sys", SimpleNamespace(stdout=object(), stderr=object()))
     monkeypatch.setattr(sys, "argv", ["audit-check", "validate", str(tmp_path)])
     monkeypatch.setattr(ac, "cmd_validate", lambda args: 0)
     assert ac.main() == 0
@@ -150,7 +151,7 @@ def test_main_handles_streams_that_reject_reconfigure(monkeypatch, tmp_path):
         def reconfigure(self, **kwargs):
             raise ValueError("cannot reconfigure")
 
-    monkeypatch.setattr(ac, "sys", SimpleNamespace(stdout=LockedStream(), stderr=LockedStream()))
+    monkeypatch.setattr(console_output, "sys", SimpleNamespace(stdout=LockedStream(), stderr=LockedStream()))
     monkeypatch.setattr(sys, "argv", ["audit-check", "validate", str(tmp_path)])
     monkeypatch.setattr(ac, "cmd_validate", lambda args: 0)
     assert ac.main() == 0
