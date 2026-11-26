@@ -266,6 +266,8 @@ class TestInstallTrust:
         ok, detail = install_trust(real_ca.cert_path, runner=runner, platform="linux")
         assert ok and "system CA bundle" in detail
         assert runner.calls[0][0] == "cp"
+        assert real_ca.fingerprint().lower() in runner.calls[0][2]
+        assert runner.calls[0][2] != "/usr/local/share/ca-certificates/plan-auditor-traffic.crt"
         assert runner.calls[1] == ["update-ca-certificates"]
 
     def test_linux_copy_failure(self, real_ca):
@@ -345,6 +347,7 @@ class TestUninstallTrust:
         runner = FakeRunner(returncodes=[0, 0, 1])
         ok, detail = uninstall_trust(real_ca.cert_path, runner=runner, platform="linux")
         assert ok and "removed from the system CA bundle" in detail
+        assert real_ca.fingerprint().lower() in runner.calls[0][2]
         assert runner.calls[1] == ["update-ca-certificates", "--fresh"]
 
     def test_linux_remove_failure(self, real_ca):

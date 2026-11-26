@@ -978,8 +978,14 @@ def _login_keychain() -> str:
     return str(Path.home() / "Library" / "Keychains" / "login.keychain-db")
 
 
-_LINUX_SYSTEM_CERT = Path("/usr/local/share/ca-certificates/plan-auditor-traffic.crt")
+_LINUX_CERT_DIR = Path("/usr/local/share/ca-certificates")
+_LINUX_CERT_PREFIX = "plan-auditor-traffic"
 _LINUX_CA_BUNDLE = Path("/etc/ssl/certs/ca-certificates.crt")
+
+
+def _linux_system_cert(cert_path: Path, ca: CertificateAuthority | None = None) -> Path:
+    fingerprint = ca.fingerprint() if ca is not None else certificate_fingerprint(cert_path)
+    return _LINUX_CERT_DIR / f"{_LINUX_CERT_PREFIX}-{fingerprint.lower()}.crt"
 
 
 def install_trust(
@@ -1005,7 +1011,8 @@ def install_trust(
             else f"certutil verification failed: {_detail(checked)}",
         )
     if platform.startswith("linux"):
-        copied = run(["cp", str(cert), str(_LINUX_SYSTEM_CERT)])
+        system_cert = _linux_system_cert(cert, ca)
+        copied = run(["cp", str(cert), str(system_cert)])
         if copied.returncode != 0:
             return False, f"cannot copy CA into the system store: {_detail(copied)}"
         updated = run(["update-ca-certificates"])
@@ -1058,7 +1065,8 @@ def uninstall_trust(
             else "certificate still present in the Root store",
         )
     if platform.startswith("linux"):
-        removed = run(["rm", "-f", str(_LINUX_SYSTEM_CERT)])
+        system_cert = _linux_system_cert(cert, ca)
+        removed = run(["rm", "-f", str(system_cert)])
         if removed.returncode != 0:
             return False, f"cannot remove CA from the system store: {_detail(removed)}"
         updated = run(["update-ca-certificates", "--fresh"])

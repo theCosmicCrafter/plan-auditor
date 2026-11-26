@@ -128,10 +128,12 @@ startup fails closed rather than overwriting the incomplete state.
 | Platform | Command used | Trust store changed |
 |---|---|---|
 | Windows | `certutil -addstore -user Root <cert>` | current-user Root certificate store |
-| Linux | copy to `/usr/local/share/ca-certificates/plan-auditor-traffic.crt`, then `update-ca-certificates` | system CA bundle |
+| Linux | copy to `/usr/local/share/ca-certificates/plan-auditor-traffic-<ca-fingerprint>.crt`, then `update-ca-certificates` | system CA bundle |
 | macOS | `security add-trusted-cert -d -r trustRoot -k <login-keychain> <cert>` | login keychain |
 
-Linux normally requires elevated privileges. macOS may prompt for keychain
+The Linux filename includes the CA fingerprint so independent workspaces do not
+overwrite or remove each other's trust entries. Linux normally requires elevated
+privileges. macOS may prompt for keychain
 authorization. Windows installation is limited to the current user but still
 changes TLS trust for that user. Install the CA only when you consent to a
 workspace-local root being trusted for TLS interception by clients that use that
@@ -142,7 +144,7 @@ store.
 | Platform | Command used | What removal means |
 |---|---|---|
 | Windows | `certutil -delstore -user Root <fingerprint>` | removes the matching CA from the current-user Root store |
-| Linux | removes `/usr/local/share/ca-certificates/plan-auditor-traffic.crt`, then `update-ca-certificates --fresh` | rebuilds the system CA bundle without the workspace CA |
+| Linux | removes `/usr/local/share/ca-certificates/plan-auditor-traffic-<ca-fingerprint>.crt`, then `update-ca-certificates --fresh` | rebuilds the system CA bundle without that workspace CA |
 | macOS | `security remove-trusted-cert -d <cert>` | removes trust for that certificate from the login keychain |
 
 After successful removal, the workspace-local CA files are deleted. Removal is
