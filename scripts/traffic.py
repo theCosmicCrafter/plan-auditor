@@ -988,6 +988,21 @@ def _linux_system_cert(cert_path: Path, ca: CertificateAuthority | None = None) 
     return _LINUX_CERT_DIR / f"{_LINUX_CERT_PREFIX}-{fingerprint.lower()}.crt"
 
 
+def _legacy_linux_system_cert() -> Path:
+    return _LINUX_CERT_DIR / f"{_LINUX_CERT_PREFIX}.crt"
+
+
+def _linux_removal_targets(cert_path: Path, ca: CertificateAuthority | None = None) -> list[Path]:
+    targets = [_linux_system_cert(cert_path, ca)]
+    legacy = _legacy_linux_system_cert()
+    try:
+        if legacy.exists() and legacy.read_bytes() == cert_path.read_bytes():
+            targets.append(legacy)
+    except OSError:
+        pass
+    return targets
+
+
 def install_trust(
     cert_path: str | Path,
     *,
@@ -1065,10 +1080,10 @@ def uninstall_trust(
             else "certificate still present in the Root store",
         )
     if platform.startswith("linux"):
-        system_cert = _linux_system_cert(cert, ca)
-        removed = run(["rm", "-f", str(system_cert)])
-        if removed.returncode != 0:
-            return False, f"cannot remove CA from the system store: {_detail(removed)}"
+        for system_cert in _linux_removal_targets(cert, ca):
+            removed = run(["rm", "-f", str(system_cert)])
+            if removed.returncode != 0:
+                return False, f"cannot remove CA from the system store: {_detail(removed)}"
         updated = run(["update-ca-certificates", "--fresh"])
         if updated.returncode != 0:
             return False, f"update-ca-certificates failed: {_detail(updated)}"

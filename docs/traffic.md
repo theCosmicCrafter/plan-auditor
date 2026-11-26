@@ -147,6 +147,9 @@ store.
 | Linux | removes `/usr/local/share/ca-certificates/plan-auditor-traffic-<ca-fingerprint>.crt`, then `update-ca-certificates --fresh` | rebuilds the system CA bundle without that workspace CA |
 | macOS | `security remove-trusted-cert -d <cert>` | removes trust for that certificate from the login keychain |
 
+For compatibility, Linux removal also deletes the pre-fingerprint fixed
+`plan-auditor-traffic.crt` entry when its bytes exactly match this workspace's
+CA; a different workspace's certificate at that legacy path is left untouched.
 After successful removal, the workspace-local CA files are deleted. Removal is
 best-effort outside the exact stores above: it cannot remove copies you manually
 imported into another user account, browser-specific store, container image, or
