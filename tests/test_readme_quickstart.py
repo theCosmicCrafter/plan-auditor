@@ -288,10 +288,25 @@ def test_docs_quickstart_uses_the_same_command_sequence(quickstart: dict) -> Non
     section = document.split("\n## Your first verified task", 1)[1].split("\n## ", 1)[0]
     commands = [
         line.strip()
-        for line in section.splitlines()
+        for info, body in _fences(section)
+        if info == "bash"
+        for line in body
         if line.strip().startswith("plan-auditor ")
     ]
     assert commands == quickstart["commands"]
+
+
+def test_shell_specific_key_configuration_precedes_integrity_init() -> None:
+    for path in (ROOT / "README.md", ROOT / "docs" / "quickstart.md"):
+        text = path.read_text(encoding="utf-8")
+        powershell = re.search(r"```powershell\n(.*?)\n```", text, re.DOTALL)
+        assert powershell, f"{path.name} must keep a PowerShell environment block"
+        block = powershell.group(1)
+        assert "$env:PLAN_AUDITOR_HMAC_KEY_FILE" in block
+        assert block.index("$env:PLAN_AUDITOR_HMAC_KEY_FILE") < block.index(
+            "plan-auditor integrity init"
+        )
+        assert "export PLAN_AUDITOR_HMAC_KEY_FILE" not in block
 
 
 def test_demo_readme_creation_refuses_to_overwrite() -> None:
