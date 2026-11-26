@@ -7,7 +7,7 @@ on this site is not in the parser surface.
 ```console
 $ plan-auditor --help
 usage: plan-auditor [-h]
-                    {supervisor,task,plan,evidence,integrity,request,agents,audit,doctor,run,validate}
+                    {supervisor,task,plan,evidence,integrity,request,agents,audit,traffic,doctor,run,validate}
                     ...
 
 Plan Auditor - independent AI agent verification supervisor.
@@ -49,6 +49,8 @@ python scripts/audit_check.py audit .
 | `plan-auditor plan inspect [dir]` | Show plan structure, coverage, and seal | `0` ok |
 | `plan-auditor audit [dir]` | Integrated final gate across every active plan | `0` proven, `1` fail, `2` blocked |
 | `plan-auditor doctor [dir]` | Machine-readable health/capability report | `0` healthy, `1`/`2` degraded |
+| `plan-auditor traffic [dir] --start/--stop/--status/--report/--verify` | Loopback HTTPS traffic evidence for a plan that opts in | `0` ok, `1` violation/failure, `2` incomplete/tampered/unverified |
+| `plan-auditor traffic [dir] --install-ca/--remove-ca` | Install or remove the workspace-local traffic CA trust material | `0` completed, `2` refused/error |
 | `plan-auditor evidence verify [dir]` | Re-verify the active and archived evidence chains | `0` valid, `1` broken |
 | `plan-auditor integrity init [dir]` | Create the external HMAC integrity material | `0` created, `1` refused |
 | `plan-auditor integrity status [dir]` | Report integrity configuration | `0` ok |
@@ -93,6 +95,26 @@ With external-key HMAC integrity:
 plan-auditor integrity init .
 plan-auditor audit .
 ```
+
+## Traffic evidence
+
+`traffic` is an experimental loopback HTTPS observation feature for plans that
+explicitly declare `traffic.allowed_hosts`:
+
+```bash
+plan-auditor traffic . --install-ca
+plan-auditor traffic . --start
+plan-auditor traffic . --stop
+plan-auditor traffic . --verify
+```
+
+The CA flags change real operating-system trust stores. `--install-ca` uses the
+current-user Root store on Windows, the system CA bundle on Linux, and the login
+keychain on macOS; `--remove-ca` removes the matching certificate from the same
+store and deletes the workspace-local CA files. Read
+[traffic evidence](traffic.md) before using either flag. A client must be
+configured to use the reported loopback proxy; a silent capture is not proof
+that no network access occurred.
 
 ## Reading `doctor` output
 

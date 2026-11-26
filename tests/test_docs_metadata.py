@@ -372,6 +372,20 @@ def test_documented_cli_invocations_exist() -> None:
     assert not problems, "; ".join(problems)
 
 
+def test_every_public_cli_command_is_documented() -> None:
+    """Coverage is bidirectional: real commands must not be absent from CLI docs."""
+    cli_doc = _read(DOCS / "cli.md")
+    missing: list[str] = []
+    for command, nested in sorted(_subcommands().items()):
+        if not re.search(rf"`plan-auditor {re.escape(command)}(?:\s|`)", cli_doc):
+            missing.append(f"plan-auditor {command}")
+        for action in sorted(nested or ()):
+            invocation = f"plan-auditor {command} {action}"
+            if not re.search(rf"`{re.escape(invocation)}(?:\s|`)", cli_doc):
+                missing.append(invocation)
+    assert not missing, "commands missing from docs/cli.md: " + ", ".join(missing)
+
+
 def test_pyproject_metadata_is_complete_and_consistent() -> None:
     text = _read(PYPROJECT)
     project = _toml_block(text, "project")
